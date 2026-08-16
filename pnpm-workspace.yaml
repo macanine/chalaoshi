@@ -1,0 +1,7 @@
+# pnpm 11 设置(此前的 "pnpm" 字段 / onlyBuiltDependencies 已迁移到 pnpm-workspace.yaml)
+# 允许以下依赖执行 install/postinstall 构建脚本
+# (esbuild / sharp / workerd 需要编译脚本才能正常工作)
+allowBuilds:
+  esbuild: true
+  sharp: true
+  workerd: true

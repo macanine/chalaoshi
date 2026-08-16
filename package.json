@@ -2,11 +2,16 @@
   "name": "chalaoshi-web",
   "version": "1.0.0",
   "private": true,
+  "packageManager": "pnpm@11.22.0",
   "description": "浙江大学查老师(chalaoshi.de)匿名教评系统的反向代理镜像:结构化 JSON API + 清爽 UI",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "cf:build": "opennextjs-cloudflare build",
+    "cf:preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "cf:deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "cf:upload": "opennextjs-cloudflare build && opennextjs-cloudflare upload"
   },
   "dependencies": {
     "next": "^15.1.6",
@@ -14,9 +19,11 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@opennextjs/cloudflare": "^1.20.2",
     "@types/node": "^22.10.2",
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
-    "typescript": "^5.7.3"
+    "typescript": "^5.7.3",
+    "wrangler": "^4.123.0"
   }
 }

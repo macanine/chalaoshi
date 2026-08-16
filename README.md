@@ -8,20 +8,22 @@
 
 ## 快速开始
 
+包管理用 **pnpm**(版本由 `package.json` 的 `packageManager` 钉死,建议装 [corepack](https://nodejs.org/api/corepack.html) 自动接管):
+
 ```bash
-npm install
+pnpm install
 cp .env.example .env.local   # 按需修改
-npm run dev                  # http://localhost:3000
+pnpm dev                     # http://localhost:3000
 ```
 
 生产部署：
 
 ```bash
-npm run build
-npm start
+pnpm build
+pnpm start
 ```
 
-> 运行机器需能访问 chalaoshi.de（通常要科学上网）。上游域名经常更换，换域名时只改环境变量即可，无需改代码。
+> 运行机器需能访问上游域（通常要科学上网）。上游域名经常更换，换域名时只改 `wrangler.jsonc` 的 vars / 环境变量即可，无需改代码。
 
 ## 环境变量
 
@@ -55,11 +57,20 @@ curl 'http://localhost:3000/api/search?q=陈建海'
 
 错误响应形如 `{ "error": "...", "upstreamStatus"?: 502 }`：404 老师不存在，429 限流（带 `retryAfter`），502 上游不可达。
 
-## Vercel 部署
+## 部署（Cloudflare Workers / Pages）
 
-项目根目录即 Next.js 应用，`vercel.json` 已内置。API 路由设置了 `maxDuration = 60`（上游抓取可能超过默认 10s）。在 Vercel 关联仓库后，按 `.env.example` 配置环境变量即可，至少要有 `CHALAOSHI_WEB_BASE` / `CHALAOSHI_API_BASE`。
+项目通过 [OpenNext Cloudflare](https://opennext.js.org/cloudflare) 运行在 Cloudflare Workers 上：页面与 API 路由共用一个 Worker，静态资源由 Workers 托管。**完整部署流程（命令行部署 / Git 集成 / 自定义域名 / 排障）见 [`CLOUDFLARE_DEPLOY.md`](CLOUDFLARE_DEPLOY.md)。**
 
-部署后查不到数据时，用 `/api/health?probe=1` 探测上游连通性（上游不通通常是域名已更换）。
+```bash
+pnpm cf:build     # 本地构建（.open-next/）
+pnpm cf:preview   # 本地 Workers 运行时预览
+pnpm cf:deploy    # 构建并部署到 Cloudflare
+```
+
+- 环境变量已写在 `wrangler.jsonc` 的 `vars` 里（默认优先 `dahua309.uk`、1s 超时、60s 熔断冷却）；换域名改这里即可，不用动代码。也可在 Cloudflare dashboard 的变量里改。
+- 首次部署需 `pnpm exec wrangler login`。
+- 也可以走 Cloudflare 的 Git 集成（Workers Builds）：见 `CLOUDFLARE_DEPLOY.md` 方式 B。
+- 部署后可用 `/api/health?probe=1` 验证：`servedBy` 显示实际响应的域，被拦的域会出现在 `disabled` 里。
 
 ## 数据说明
 

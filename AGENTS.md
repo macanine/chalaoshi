@@ -7,8 +7,10 @@
 ## 技术栈
 
 - **Next.js 15(App Router)+ React 19 + TypeScript**,零其他运行时依赖
+- 包管理:**pnpm**(`package.json` 的 `packageManager` 字段钉死版本,**不要用 npm/yarn 新增或安装依赖**——它们的 lockfile 会污染项目)
 - 服务端: Route Handlers 做 API;内存缓存 + 滑动窗口限流
 - 前端: 全客户端组件实现 SPA 式体验(无第三方 UI 库)
+- 部署: **OpenNext Cloudflare** 编译成单个 Worker 跑在 Cloudflare Workers 上,见 `CLOUDFLARE_DEPLOY.md`
 - 设计系统: `app/globals.css` 里的 CSS 变量(明/暗双主题),所有组件共用
 
 ## 目录结构
@@ -82,15 +84,20 @@ lib/
 
 12. **骨架屏宽度要对齐真实内容,不要用容器百分比**: 中文字很短,姓名条用 `40%` 在宽容器里会变成 400px 的巨杠,和真实的 80px 名字严重不符。姓名/学院/统计等短内容一律用**固定像素宽**(姓名 ~100px、学院 ~190px),评论这种整段长文才可以用百分比。`.skeleton` 基类带 `width: 100%` 兜底,不会塌陷。
 
+13. **环境变量惰性读取**: 不要在模块加载时读 `process.env`——Cloudflare 的 env→`process.env` 填充(`populateProcessEnv`)发生在 worker 初始化后, 模块级读取会拿到空值而落到默认值。一律在请求时读, `lib/chalaoshi.ts` 的 `getWebBases()`/`getTimeoutMs()` 就是样板。
+
 ## 开发命令
 
 ```bash
-npm run dev      # 开发, http://localhost:3000 (本机占用时 Next 会换端口, 看日志)
-npm run build    # 生产构建(兼做类型检查)
-npm start        # 生产启动
+pnpm dev      # 开发, http://localhost:3000 (本机占用时 Next 会换端口, 看日志)
+pnpm build    # 生产构建(兼做类型检查)
+pnpm start    # 生产启动
+pnpm cf:build     # OpenNext Cloudflare 构建(.open-next/)
+pnpm cf:preview   # 本地 Workers 运行时预览
+pnpm cf:deploy    # 构建并部署到 Cloudflare Workers
 ```
 
-环境变量见 `.env.example`,复制为 `.env.local` 按需改。运行机器需能访问 chalaoshi.de(通常要科学上网)。
+环境变量见 `.env.example`(本地 dev 用 `.env.local`) 与 `wrangler.jsonc` 的 `vars`(CF 部署用)。运行机器需能访问上游域(通常要科学上网)。完整部署流程见 `CLOUDFLARE_DEPLOY.md`。
 
 ## 常见改动路径
 

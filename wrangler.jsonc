@@ -1,0 +1,28 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "chalaoshi",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2024-12-30",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "services": [
+    {
+      "binding": "WORKER_SELF_REFERENCE",
+      "service": "chalaoshi"
+    }
+  ],
+  "vars": {
+    "CHALAOSHI_WEB_BASE": "https://dahua309.uk,https://chalaoshi.de",
+    "CHALAOSHI_API_BASE": "https://api.dahua309.uk,https://api.chalaoshi.de",
+    "CHALAOSHI_TIMEOUT_MS": "1000",
+    "FAILOVER_COOLDOWN_MS": "60000",
+    "CACHE_TTL_SEARCH": "60",
+    "CACHE_TTL_TEACHER": "300",
+    "CACHE_TTL_COMMENTS": "60",
+    "CACHE_TTL_GPA": "1800",
+    "RATE_LIMIT_PER_MIN": "60"
+  }
+}

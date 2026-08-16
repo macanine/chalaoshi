@@ -16,7 +16,6 @@ export class UpstreamError extends Error {
 }
 
 const UA = 'Mozilla/5.0 (compatible; chalaoshi-web/1.0; +reverse-proxy)';
-const TIMEOUT_MS = Number(process.env.CHALAOSHI_TIMEOUT_MS ?? 1000);
 
 const DEFAULTS = { SEARCH: 60, TEACHER: 300, COMMENTS: 60, GPA: 1800 } as const;
 type CacheKind = keyof typeof DEFAULTS;
@@ -36,11 +35,25 @@ function parseBases(env: string | undefined, fallback: string): string[] {
   return [fallback];
 }
 
-const webBases = parseBases(process.env.CHALAOSHI_WEB_BASE, 'https://dahua309.uk,https://chalaoshi.de');
-const apiBases = parseBases(process.env.CHALAOSHI_API_BASE, 'https://api.dahua309.uk,https://api.chalaoshi.de');
+// 环境变量一律在请求时读取(惰性): Cloudflare 的 env->process.env 填充发生在 worker 初始化
+// 阶段之后, 模块加载时读会拿到空值而落到默认值; 惰性读取保证部署时配置的变量一定生效。
+function getWebBases(): string[] {
+  return parseBases(process.env.CHALAOSHI_WEB_BASE, 'https://dahua309.uk,https://chalaoshi.de');
+}
+
+function getApiBases(): string[] {
+  return parseBases(process.env.CHALAOSHI_API_BASE, 'https://api.dahua309.uk,https://api.chalaoshi.de');
+}
+
+function getTimeoutMs(): number {
+  return Number(process.env.CHALAOSHI_TIMEOUT_MS ?? 1000);
+}
+
+function getCooldownMs(): number {
+  return Number(process.env.FAILOVER_COOLDOWN_MS ?? 60_000);
+}
 
 // ---- 域级故障熔断: 某域名失败(CF 拦截/超时/5xx/空响应)后, 冷却期内跳过它, 冷却结束自动恢复 ----
-const DISABLED_COOLDOWN_MS = Number(process.env.FAILOVER_COOLDOWN_MS ?? 60_000);
 const disabledUntil = new Map<string, number>();
 let lastServedBase: string | null = null;
 
@@ -55,7 +68,7 @@ function isBaseDisabled(base: string): boolean {
 }
 
 function disableBase(base: string): void {
-  disabledUntil.set(base, Date.now() + DISABLED_COOLDOWN_MS);
+  disabledUntil.set(base, Date.now() + getCooldownMs());
 }
 
 /** 该状态码说明"这个域名本身坏了"(Cloudflare 拦截 / 上游故障 / 限流), 应熔断; 404 之类是资源层面, 不熔断 */
@@ -75,7 +88,7 @@ async function fetchWithFailover(bases: string[], pathAndQuery: string): Promise
           Accept: 'text/html,application/xhtml+xml,*/*;q=0.8',
           'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.6',
         },
-        signal: AbortSignal.timeout(TIMEOUT_MS),
+        signal: AbortSignal.timeout(getTimeoutMs()),
         cache: 'no-store',
       });
       if (!res.ok) {
@@ -125,7 +138,7 @@ export async function searchTeachers(q: string): Promise<TeacherHit[]> {
   if (cached) return cached;
 
   const path = '/search?' + new URLSearchParams({ q }).toString();
-  const body = await fetchWithFailover(webBases, path);
+  const body = await fetchWithFailover(getWebBases(), path);
 
   const re =
     /class="item"[^>]*window\.location='\/t\/(\d+)\/'[\s\S]*?<h3>([^<]+)<\/h3>[\s\S]*?<p>([^<]*)<\/p>[\s\S]*?<h2>([^<]+)<\/h2>/g;
@@ -155,7 +168,7 @@ export async function teacherDetail(tid: string): Promise<TeacherDetail> {
   const cached = cacheGet<TeacherDetail>(key);
   if (cached) return cached;
 
-  const body = await fetchWithFailover(webBases, `/t/${tid}/`);
+  const body = await fetchWithFailover(getWebBases(), `/t/${tid}/`);
 
   const nameM = body.match(/class="teacher">[\s\S]*?<h3>([^<]+)<\/h3>/);
   const name = cleanHtml(nameM?.[1] ?? '');
@@ -194,7 +207,7 @@ export async function fetchComments(tid: string, sort: CommentSort): Promise<Com
   const cached = cacheGet<Comment[]>(key);
   if (cached) return cached;
 
-  const body = await fetchWithFailover(apiBases, `/comments/${tid}?sort=${sort}`);
+  const body = await fetchWithFailover(getApiBases(), `/comments/${tid}?sort=${sort}`);
 
   const comments: Comment[] = [];
   // 前 10 条为排序头部, 其余用 <hr id="sep"> 分隔; 解析整段即可拿到全部评论(顺序与上游排序一致)
@@ -220,7 +233,7 @@ export async function courseGpa(course: string): Promise<GpaRow[]> {
   const cached = cacheGet<GpaRow[]>(key);
   if (cached) return cached;
 
-  const body = await fetchWithFailover(apiBases, '/gpa?' + new URLSearchParams({ course }).toString());
+  const body = await fetchWithFailover(getApiBases(), '/gpa?' + new URLSearchParams({ course }).toString());
 
   const rows: GpaRow[] = [];
   const re =
@@ -239,10 +252,10 @@ export async function courseGpa(course: string): Promise<GpaRow[]> {
 
 export function upstreamConfig() {
   return {
-    webBases,
-    apiBases,
-    timeoutMs: TIMEOUT_MS,
-    cooldownMs: DISABLED_COOLDOWN_MS,
+    webBases: getWebBases(),
+    apiBases: getApiBases(),
+    timeoutMs: getTimeoutMs(),
+    cooldownMs: getCooldownMs(),
     disabledBases: [...disabledUntil.keys()].filter((b) => isBaseDisabled(b)),
     lastServedBase,
   };

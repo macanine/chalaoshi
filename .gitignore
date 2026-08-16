@@ -5,3 +5,8 @@ build/
 *.tsbuildinfo
 .env*.local
 .DS_Store
+.open-next/
+.wrangler/
+.dev.vars
+worker-configuration.d.ts
+cloudflare-env.d.ts
