@@ -26,13 +26,13 @@ function ttlSeconds(kind: CacheKind): number {
 }
 
 function parseBases(env: string | undefined, fallback: string): string[] {
-  if (env && env.trim()) {
-    return env
-      .split(',')
-      .map((s) => s.trim().replace(/\/+$/, ''))
-      .filter(Boolean);
-  }
-  return [fallback];
+  // env 与 fallback 都是逗号分隔的域名串, 统一按逗号拆(之前 fallback 分支漏拆,
+  // 导致 next dev 里 env 未注入时把 "a.com,b.com" 当成了单个域名, 必 502)
+  const raw = env && env.trim() ? env : fallback;
+  return raw
+    .split(',')
+    .map((s) => s.trim().replace(/\/+$/, ''))
+    .filter(Boolean);
 }
 
 // 环境变量一律在请求时读取(惰性): Cloudflare 的 env->process.env 填充发生在 worker 初始化

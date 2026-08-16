@@ -84,7 +84,7 @@ lib/
 
 12. **骨架屏宽度要对齐真实内容,不要用容器百分比**: 中文字很短,姓名条用 `40%` 在宽容器里会变成 400px 的巨杠,和真实的 80px 名字严重不符。姓名/学院/统计等短内容一律用**固定像素宽**(姓名 ~100px、学院 ~190px),评论这种整段长文才可以用百分比。`.skeleton` 基类带 `width: 100%` 兜底,不会塌陷。
 
-13. **环境变量惰性读取**: 不要在模块加载时读 `process.env`——Cloudflare 的 env→`process.env` 填充(`populateProcessEnv`)发生在 worker 初始化后, 模块级读取会拿到空值而落到默认值。一律在请求时读, `lib/chalaoshi.ts` 的 `getWebBases()`/`getTimeoutMs()` 就是样板。
+13. **环境变量惰性读取**: 不要在模块加载时读 `process.env`——Cloudflare 的 env→`process.env` 填充(`populateProcessEnv`)发生在 worker 初始化后, 模块级读取会拿到空值而落到默认值。一律在请求时读, `lib/chalaoshi.ts` 的 `getWebBases()`/`getTimeoutMs()` 就是样板。**注意**: `initOpenNextCloudflareForDev()` 只把 vars 放进 `getCloudflareContext()`, **不会填充 `process.env`**, 所以 `next dev` 用的是代码默认值或 `.env.local`; 若要 dev 与线上不同, 用 `.env.local` 覆盖(wrangler.jsonc 只作用于部署/`cf:preview`)。`parseBases` 对 env 和 fallback 都按逗号拆(漏拆会把 `a.com,b.com` 当单个域名, 必 502)。
 
 ## 开发命令
 
