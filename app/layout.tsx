@@ -7,8 +7,8 @@ export const metadata: Metadata = {
   description:
     '浙江大学非官方匿名教评系统(chalaoshi.de)镜像——查老师评分、点名率、评论, 对比课程绩点。数据来自匿名用户与「课否」。',
   icons: {
-    icon: '/icon.svg',
-    apple: '/apple-touch-icon.png',
+    icon: '/icon.png',
+    apple: '/icon.png',
   },
   appleWebApp: {
     capable: true,

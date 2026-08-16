@@ -9,13 +9,13 @@ export const maxDuration = 60; // Vercel: 上游探测可能超过默认 10s, �
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const probe = url.searchParams.get('probe') === '1';
-  const { webBases, apiBases, disabledBases, lastServedBase } = upstreamConfig();
+  const { webBases, apiBases, fallbackBases, disabledBases, lastServedBase } = upstreamConfig();
 
   const body: Record<string, unknown> = {
     ok: true,
     time: new Date().toISOString(),
     cacheEntries: cacheSize(),
-    upstream: { web: webBases, api: apiBases, disabled: disabledBases },
+    upstream: { web: webBases, api: apiBases, fallback: fallbackBases, disabled: disabledBases },
     lastServedBase,
   };
 

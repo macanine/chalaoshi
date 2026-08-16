@@ -1,6 +1,6 @@
 /**
  * chalaoshi.de 反向代理核心: 抓取上游 HTML 并解析为结构化 JSON。
- * 解析正则直接移植自 .claude/skills/chalaoshi/scripts/chalaoshi.py (线上验证过), 不要凭感觉改。
+ * 解析正则已对照线上 HTML 验证过, 不要凭感觉改。
  */
 
 import { cacheGet, cacheSet } from './cache';
@@ -45,6 +45,12 @@ function getApiBases(): string[] {
   return parseBases(process.env.CHALAOSHI_API_BASE, 'https://api.dahua309.uk,https://api.chalaoshi.de');
 }
 
+/** 全站同类服务兜底: 主域名列表全部失败(被拦/超时/5xx)后, 再试这里配的镜像站。
+ *  逗号分隔; 留空则不启用。兜底站必须与上游返回同样结构的 HTML/JSON(同一 path), 例如本项目在另一平台的部署。 */
+function getFallbackBases(): string[] {
+  return parseBases(process.env.CHALAOSHI_FALLBACK, '');
+}
+
 function getTimeoutMs(): number {
   return Number(process.env.CHALAOSHI_TIMEOUT_MS ?? 8000);
 }
@@ -76,10 +82,13 @@ function isDomainLevelStatus(status: number): boolean {
   return status === 403 || status === 408 || status === 429 || status >= 500;
 }
 
-/** 依次尝试多个域名: 跳过已熔断的, 失败即熔断并切下一个, 全部失败才抛错(域名经常换, failover 提升可用性) */
-async function fetchWithFailover(bases: string[], pathAndQuery: string): Promise<string> {
-  // 若所有域名都处于熔断冷却期, 仍按优先级真试一次——否则冷却期内整站一律快速 502,
-  // 且上游恢复后也要等冷却结束才重新纳入, 无法立刻感知(曾因超时熔断所有域名导致整站静默 60s)
+/** 依次尝试一组域名: 跳过已熔断的, 失败即熔断并切下一个; 整组全失败才返回 { ok:false }。
+ *  若所有域名都处于熔断冷却期, 仍按优先级真试一次——否则冷却期内整站一律快速 502,
+ *  且上游恢复后也要等冷却结束才重新纳入, 无法立刻感知(曾因超时熔断所有域名导致整站静默 60s) */
+async function tryBases(
+  bases: string[],
+  pathAndQuery: string
+): Promise<{ ok: true; text: string } | { ok: false; error: unknown }> {
   const probeAll = bases.length > 0 && bases.every((b) => isBaseDisabled(b));
   let lastError: unknown;
   for (const base of bases) {
@@ -108,14 +117,32 @@ async function fetchWithFailover(bases: string[], pathAndQuery: string): Promise
       }
       disabledUntil.delete(base); // 恢复成功, 立即解除该域熔断
       lastServedBase = base;
-      return text;
+      return { ok: true, text };
     } catch (e) {
       // 网络错误 / 超时(AbortSignal.timeout): 域名不可达, 熔断
       disableBase(base);
       lastError = e;
     }
   }
-  if (lastError instanceof UpstreamError) throw lastError;
+  return { ok: false, error: lastError };
+}
+
+/** 先按优先级试主域名列表, 全部失败再 fallback 到同类镜像站(CHALAOSHI_FALLBACK), 仍失败才抛错 */
+async function fetchWithFailover(bases: string[], pathAndQuery: string): Promise<string> {
+  const primary = await tryBases(bases, pathAndQuery);
+  if (primary.ok) return primary.text;
+
+  // 404 是资源层面"不存在"的确定答案, 同类镜像站也会 404, 不必再兜底
+  if (primary.error instanceof UpstreamError && primary.error.status === 404) throw primary.error;
+
+  const fallback = getFallbackBases();
+  if (fallback.length > 0) {
+    const fb = await tryBases(fallback, pathAndQuery);
+    if (fb.ok) return fb.text;
+  }
+
+  // 报主域名的错误(它才是配置的根因), 兜底失败只是连带
+  if (primary.error instanceof UpstreamError) throw primary.error;
   throw new UpstreamError(`无法连接上游 ${bases.join(', ')} (需要科学上网或域名已更换)`, 502);
 }
 
@@ -258,6 +285,7 @@ export function upstreamConfig() {
   return {
     webBases: getWebBases(),
     apiBases: getApiBases(),
+    fallbackBases: getFallbackBases(),
     timeoutMs: getTimeoutMs(),
     cooldownMs: getCooldownMs(),
     disabledBases: [...disabledUntil.keys()].filter((b) => isBaseDisabled(b)),

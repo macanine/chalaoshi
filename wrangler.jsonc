@@ -17,6 +17,7 @@
   "vars": {
     "CHALAOSHI_WEB_BASE": "https://dahua309.uk,https://chalaoshi.de",
     "CHALAOSHI_API_BASE": "https://api.dahua309.uk,https://api.chalaoshi.de",
+    "CHALAOSHI_FALLBACK": "",
     "CHALAOSHI_TIMEOUT_MS": "8000",
     "FAILOVER_COOLDOWN_MS": "60000",
     "CACHE_TTL_SEARCH": "60",
