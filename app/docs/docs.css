@@ -1,0 +1,275 @@
+/* ------------------------------------------------ API docs (/docs) */
+
+.docs {
+  margin: 0;
+}
+
+.docs-head {
+  padding: 20px 0 6px;
+}
+
+.docs-head h1 {
+  font-size: 26px;
+  margin: 0 0 8px;
+  letter-spacing: 0.5px;
+}
+
+.docs-head p {
+  color: var(--muted);
+  font-size: 14px;
+  margin: 0;
+}
+
+/* 基础 URL + 复制给 AI */
+.docs-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+  padding: 14px 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.base-url {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--muted);
+  min-width: 0;
+}
+
+.base-url code {
+  font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+  word-break: break-all;
+}
+
+.docs-copy-btn {
+  flex-shrink: 0;
+  min-height: 40px;
+  padding: 0 16px;
+  font-size: 13px;
+}
+
+.docs-section {
+  margin-top: 32px;
+}
+
+.docs-section h2 {
+  font-size: 21px;
+  margin: 0 0 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.docs-p {
+  color: var(--muted);
+  font-size: 14px;
+  margin: 10px 0;
+}
+
+/* ---- endpoint cards ---- */
+.doc-endpoint {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 20px 22px;
+  margin-bottom: 16px;
+}
+
+.doc-ep-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.doc-method {
+  flex-shrink: 0;
+  padding: 3px 9px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: var(--accent-ink);
+  background: var(--accent);
+}
+
+.doc-path {
+  font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  word-break: break-all;
+}
+
+.doc-try {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.doc-try:hover {
+  text-decoration: underline;
+}
+
+.doc-ep-desc {
+  color: var(--muted);
+  font-size: 14px;
+  margin: 10px 0 0;
+}
+
+.doc-endpoint h4 {
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 600;
+  margin: 18px 0 8px;
+}
+
+/* ---- params table ---- */
+.docs-params {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.docs-params th,
+.docs-params td {
+  text-align: left;
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.docs-params th {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.docs-params tr:last-child td {
+  border-bottom: none;
+}
+
+.docs-params td:first-child {
+  white-space: nowrap;
+}
+
+.param-type {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* ---- code blocks ---- */
+.inline-code {
+  font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.9em;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--bg-soft);
+  color: var(--accent);
+}
+
+.doc-code {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 10px 0 0;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: #0d1117;
+  color: #e6edf3;
+  font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.doc-code code {
+  font-family: inherit;
+}
+
+.doc-code-inline {
+  display: inline-block;
+  margin: 0;
+  padding: 6px 10px;
+  font-size: 12.5px;
+  vertical-align: middle;
+}
+
+/* ---- lists ---- */
+.docs-list {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 14px;
+  line-height: 1.9;
+}
+
+.docs-list strong {
+  color: var(--text);
+}
+
+/* 入场动画: 与其他页面一致(rise), 端点卡片依次上浮 */
+.docs-head,
+.docs-top {
+  animation: rise 0.4s ease both;
+}
+
+.doc-endpoint {
+  animation: rise 0.4s ease both;
+}
+
+.doc-endpoint:nth-of-type(1) { animation-delay: 0.04s; }
+.doc-endpoint:nth-of-type(2) { animation-delay: 0.08s; }
+.doc-endpoint:nth-of-type(3) { animation-delay: 0.12s; }
+.doc-endpoint:nth-of-type(4) { animation-delay: 0.16s; }
+.doc-endpoint:nth-of-type(5) { animation-delay: 0.2s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .docs-head,
+  .docs-top,
+  .doc-endpoint {
+    animation: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .docs-head {
+    padding-top: 14px;
+  }
+
+  .docs-head h1 {
+    font-size: 22px;
+  }
+
+  .docs-top {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .docs-copy-btn {
+    width: 100%;
+  }
+
+  .doc-endpoint {
+    padding: 16px;
+  }
+
+  .docs-section {
+    margin-top: 28px;
+  }
+
+  .docs-params th:nth-child(2),
+  .docs-params td:nth-child(2) {
+    display: none; /* 手机上隐藏"类型"列, 更紧凑 */
+  }
+}

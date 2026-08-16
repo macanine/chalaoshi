@@ -1,0 +1,996 @@
+:root {
+  --bg: #f5f6f8;
+  --bg-soft: #eceef1;
+  --card: #ffffff;
+  --border: #e3e6ea;
+  --text: #1b1f27;
+  --muted: #6b7280;
+  --accent: #2f6df6;
+  --accent-ink: #ffffff;
+  --accent-soft: #e8effd;
+  --green: #1f9d55;
+  --teal: #0f9d8f;
+  --amber: #c98a0a;
+  --orange: #d9650f;
+  --red: #d33a2c;
+  --shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 4px 16px rgba(16, 24, 40, 0.06);
+  --radius: 14px;
+  /* 半透明层(毛玻璃背景/边框/焦点环/骨架屏闪光): 用 rgba, 兼容不支持 color-mix 的环境 */
+  --glass-bg: rgba(245, 246, 248, 0.62);
+  --glass-border: rgba(227, 230, 234, 0.85);
+  --nav-bg: rgba(255, 255, 255, 0.88);
+  --accent-ring: rgba(47, 109, 246, 0.18);
+  --accent-glow: rgba(47, 109, 246, 0.35);
+  --red-bg: rgba(211, 58, 44, 0.1);
+  --red-border: rgba(211, 58, 44, 0.4);
+  --shimmer: rgba(255, 255, 255, 0.7);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e1013;
+    --bg-soft: #161a21;
+    --card: #171b22;
+    --border: #272e38;
+    --text: #e7e9ee;
+    --muted: #99a2af;
+    --accent: #5a8bf7;
+    --accent-ink: #0b1020;
+    --accent-soft: #1c2a44;
+    --green: #34c26b;
+    --teal: #22b8a8;
+    --amber: #d9a524;
+    --orange: #e07a2f;
+    --red: #e05a4b;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 16px rgba(0, 0, 0, 0.4);
+    --glass-bg: rgba(14, 16, 19, 0.62);
+    --glass-border: rgba(39, 46, 56, 0.85);
+    --nav-bg: rgba(23, 27, 34, 0.88);
+    --accent-ring: rgba(90, 139, 247, 0.18);
+    --accent-glow: rgba(90, 139, 247, 0.4);
+    --red-bg: rgba(224, 90, 75, 0.1);
+    --red-border: rgba(224, 90, 75, 0.4);
+    --shimmer: rgba(255, 255, 255, 0.08);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei', 'Noto Sans CJK SC', 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  touch-action: manipulation; /* 去掉双击缩放延迟, 点按更跟手 */
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* 全局唯一容器: 全站统一 600px 居中(桌面窄栏、移动满宽), 边距流式(clamp) */
+.container {
+  width: 100%;
+  max-width: 600px;
+  margin-inline: auto;
+  padding-inline: clamp(16px, 4vw, 28px);
+}
+
+/* ------------------------------------------------ header */
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--glass-bg);
+  backdrop-filter: blur(18px) saturate(170%);
+  -webkit-backdrop-filter: blur(18px) saturate(170%);
+  border-bottom: 1px solid var(--glass-border);
+  box-shadow: 0 1px 0 rgba(16, 24, 40, 0.02), 0 8px 24px -14px rgba(16, 24, 40, 0.14);
+}
+
+.header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 56px;
+}
+
+.brand {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 0.5px;
+}
+
+.brand span {
+  color: var(--accent);
+}
+
+.brand:hover {
+  text-decoration: none;
+}
+
+.nav {
+  display: flex;
+  gap: 20px;
+  font-size: 14px;
+}
+
+.nav a {
+  color: var(--muted);
+}
+
+.nav a:hover {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.github-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin-left: 12px;
+  border-radius: 10px;
+  color: var(--muted);
+  transition: color 0.15s, background 0.15s;
+}
+
+.github-link:hover {
+  color: var(--text);
+  background: var(--bg-soft);
+  text-decoration: none;
+}
+
+/* ------------------------------------------------ layout */
+.main {
+  flex: 1 0 auto;
+  /* 左右边距交给 .container; 这里只管上下 */
+  padding-block: 32px 76px;
+}
+
+.hero {
+  text-align: center;
+  padding: 48px 0 28px;
+}
+
+.hero h1 {
+  font-size: 32px;
+  margin: 0 0 10px;
+  letter-spacing: 0.5px;
+}
+
+.subtitle {
+  color: var(--muted);
+  font-size: 15px;
+  margin: 0;
+}
+
+/* ------------------------------------------------ search */
+.search-form {
+  display: flex;
+  gap: 10px;
+  animation: search-in 0.4s ease both;
+}
+
+@keyframes search-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.search-form input {
+  flex: 1;
+  min-width: 0;
+  height: 48px;
+  padding: 0 18px;
+  font-size: 16px;
+  color: var(--text);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.search-form input:focus {
+  border-color: var(--accent);
+  animation: focus-breathe 2.2s ease-in-out infinite;
+}
+
+@keyframes focus-breathe {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px var(--accent-ring);
+  }
+  50% {
+    box-shadow: 0 0 0 6px var(--accent-ring);
+  }
+}
+
+.search-form input::-webkit-search-cancel-button {
+  cursor: pointer;
+}
+
+.search-form button {
+  flex-shrink: 0;
+  height: 48px;
+  padding: 0 22px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--accent-ink);
+  background: var(--accent);
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.15s, box-shadow 0.15s;
+}
+
+.search-form button:hover:not(:disabled) {
+  opacity: 0.92;
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px -10px var(--accent-glow);
+}
+
+.search-form button:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+}
+
+.search-form button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.form-hint {
+  margin: 10px 0 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* ------------------------------------------------ cards / panels */
+.panel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 22px 24px;
+  margin-top: 20px;
+}
+
+.section-title {
+  font-size: 18px;
+  margin: 0 0 4px;
+}
+
+.section-sub {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0 0 14px;
+}
+
+/* teacher search results */
+.results-count {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 18px 4px 10px;
+}
+
+.teacher-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.teacher-list li {
+  animation: rise 0.3s ease both;
+}
+
+.teacher-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-bottom: 10px;
+  transition: border-color 0.15s, transform 0.15s, background 0.15s;
+}
+
+.teacher-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+  text-decoration: none;
+}
+
+.teacher-card:active {
+  transform: scale(0.99);
+  background: var(--bg-soft);
+}
+
+.teacher-card-name {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.teacher-card-college {
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+/* score badge */
+.score {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 15px;
+  color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  flex-shrink: 0;
+}
+
+.score-good { background: var(--green); }
+.score-fine { background: var(--teal); }
+.score-mid  { background: var(--amber); }
+.score-low  { background: var(--orange); }
+.score-bad  { background: var(--red); }
+.score-na   { background: var(--muted); }
+
+/* ------------------------------------------------ teacher page */
+.back-link {
+  display: inline-block;
+  margin: 6px 2px 2px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.back-link:hover {
+  color: var(--accent);
+}
+
+.teacher-header-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.teacher-name {
+  font-size: 26px;
+  margin: 0;
+  line-height: 1.25;
+}
+
+.teacher-college {
+  color: var(--muted);
+  margin: 4px 0 0;
+  font-size: 14px;
+}
+
+.teacher-score {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.score-big {
+  font-size: 40px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.score-big.good { color: var(--green); }
+.score-big.fine { color: var(--teal); }
+.score-big.mid  { color: var(--amber); }
+.score-big.low  { color: var(--orange); }
+.score-big.bad  { color: var(--red); }
+.score-big.na   { color: var(--muted); }
+
+.teacher-score-label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.stats {
+  display: flex;
+  gap: 32px;
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stat-num {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* course chips */
+.course-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
+}
+
+.course-chip {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  background: var(--bg-soft);
+  border: 1px solid transparent; /* 占位, 悬浮变 accent 时不抖动 */
+  border-radius: 10px;
+}
+
+.course-chip-link {
+  color: var(--text);
+  text-decoration: none;
+  transition: border-color 0.15s, transform 0.15s, background 0.15s;
+}
+
+.course-chip-link:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  transform: translateY(-1px);
+  text-decoration: none;
+}
+
+.course-chip-link:hover .course-chip-name {
+  color: var(--accent);
+}
+
+.course-chip-link .course-chip-name::after {
+  content: ' ↗';
+  color: var(--accent);
+  font-size: 0.85em;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+
+.course-chip-link:hover .course-chip-name::after {
+  opacity: 1;
+}
+
+.course-chip-name {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.course-chip-gpa {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.course-chip-count {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* ------------------------------------------------ comments */
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.tab {
+  min-height: 40px;
+  padding: 7px 16px;
+  font-size: 14px;
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.tab:hover {
+  color: var(--text);
+}
+
+.tab.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.comment {
+  padding: 16px 2px;
+  border-bottom: 1px solid var(--border);
+  animation: rise 0.25s ease both;
+}
+
+.comment:last-of-type {
+  border-bottom: none;
+}
+
+.comment-body {
+  font-size: 15px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.comment-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.comment-likes {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.load-more {
+  display: flex;
+  justify-content: center;
+  padding-top: 18px;
+}
+
+.comment-list-skeleton .comment {
+  padding-top: 6px;
+}
+
+/* ------------------------------------------------ table (gpa) */
+.table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+table.gpa {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+table.gpa th,
+table.gpa td {
+  text-align: left;
+  padding: 11px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+table.gpa th {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 13px;
+}
+
+table.gpa tr:last-child td {
+  border-bottom: none;
+}
+
+.gpa-val {
+  font-weight: 700;
+}
+
+.gpa-val.high { color: var(--green); }
+.gpa-val.mid  { color: var(--teal); }
+.gpa-val.low  { color: var(--muted); }
+
+.gpa-teacher {
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.gpa-teacher:hover {
+  text-decoration: underline;
+}
+
+/* ------------------------------------------------ buttons / misc */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 18px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent-ink);
+  background: var(--accent);
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.btn:hover {
+  opacity: 0.88;
+  text-decoration: none;
+}
+
+.btn.ghost {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+.error-note {
+  margin: 16px 4px 0;
+  padding: 12px 16px;
+  background: var(--red-bg);
+  border: 1px solid var(--red-border);
+  border-radius: 10px;
+  color: var(--red);
+  font-size: 14px;
+}
+
+.empty {
+  text-align: center;
+  padding: 80px 20px;
+  color: var(--muted);
+}
+
+.empty.panel {
+  padding: 56px 20px;
+}
+
+.empty h1 {
+  font-size: 28px;
+  margin: 0 0 8px;
+  color: var(--text);
+}
+
+.gpa-note {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 14px;
+}
+
+/* ------------------------------------------------ skeleton / spinner */
+.skeleton {
+  display: block;
+  position: relative;
+  overflow: hidden;
+  width: 100%; /* 默认占满所在单元格, 避免宽度塌陷 */
+  background: var(--bg-soft);
+  border-radius: 8px;
+}
+
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, var(--shimmer), transparent);
+  animation: shimmer 1.3s infinite;
+}
+
+@keyframes shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.spinner {
+  display: inline-block;
+  width: 22px;
+  height: 22px;
+  border: 2.5px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 用户偏好减少动效时, 关闭骨架屏闪光与入场动画 */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after,
+  .spinner,
+  .comment,
+  .teacher-list li,
+  .search-form,
+  .search-form input:focus {
+    animation: none;
+  }
+
+  .search-form input:focus {
+    box-shadow: 0 0 0 3px var(--accent-ring);
+  }
+}
+
+/* ------------------------------------------------ bottom nav (mobile) */
+.bottom-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  display: flex;
+  background: var(--nav-bg);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-top: 1px solid var(--border);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.bottom-nav a {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  height: 56px;
+  font-size: 11px;
+  color: var(--muted);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.bottom-nav a:hover {
+  text-decoration: none;
+}
+
+.bottom-nav a.active {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.bottom-nav a svg {
+  display: block;
+}
+
+/* ------------------------------------------------ footer */
+.site-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 15;
+  background: var(--glass-bg);
+  backdrop-filter: blur(18px) saturate(170%);
+  -webkit-backdrop-filter: blur(18px) saturate(170%);
+  border-top: 1px solid var(--glass-border);
+  box-shadow: 0 -1px 0 rgba(16, 24, 40, 0.02), 0 -8px 24px -14px rgba(16, 24, 40, 0.14);
+  padding: 12px 0;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+/* ------------------------------------------------ responsive */
+@media (max-width: 768px) {
+  .nav {
+    display: none;
+  }
+
+  .header-inner {
+    height: 52px;
+  }
+
+  .brand {
+    font-size: 18px;
+  }
+
+  .main {
+    padding-top: 20px;
+    padding-bottom: calc(112px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .site-footer {
+    bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+@media (min-width: 769px) {
+  .bottom-nav {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .hero {
+    padding: 26px 0 18px;
+  }
+
+  .hero h1 {
+    font-size: 24px;
+  }
+
+  .subtitle {
+    font-size: 14px;
+  }
+
+  .search-form {
+    flex-direction: row;
+  }
+
+  .search-form input {
+    height: 50px;
+    font-size: 16px;
+    padding: 0 16px;
+  }
+
+  .search-form button {
+    height: 50px;
+    padding: 0 20px;
+  }
+
+  .panel {
+    padding: 18px 16px;
+  }
+
+  .teacher-header-top {
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .teacher-name {
+    font-size: 21px;
+  }
+
+  .score-big {
+    font-size: 34px;
+  }
+
+  .stats {
+    gap: 8px;
+    margin-top: 18px;
+  }
+
+  .stat {
+    flex: 1;
+    align-items: center;
+    text-align: center;
+  }
+
+  .stat-num {
+    font-size: 18px;
+  }
+
+  .course-grid {
+    grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  }
+
+  .tabs {
+    gap: 8px;
+  }
+
+  .tab {
+    flex: 1;
+    padding: 9px 0;
+    text-align: center;
+  }
+
+  .comment-body {
+    font-size: 16px;
+  }
+
+  /* 绩点表在手机上变成卡片列表 */
+  .table-wrap {
+    overflow: visible;
+  }
+
+  table.gpa thead {
+    display: none;
+  }
+
+  table.gpa,
+  table.gpa tbody,
+  table.gpa tr,
+  table.gpa td {
+    display: block;
+  }
+
+  table.gpa tr {
+    background: var(--bg-soft);
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+  }
+
+  table.gpa td {
+    padding: 0;
+    border-bottom: none;
+  }
+
+  table.gpa td:first-child {
+    font-weight: 600;
+    font-size: 15px;
+  }
+
+  table.gpa td:nth-child(2),
+  table.gpa td:nth-child(3) {
+    display: inline-block;
+    margin-top: 2px;
+    font-size: 13px;
+  }
+
+  table.gpa td:nth-child(2) {
+    font-weight: 700;
+    color: var(--accent);
+    margin-right: 10px;
+  }
+
+  table.gpa td:nth-child(3) {
+    color: var(--muted);
+  }
+}

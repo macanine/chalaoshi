@@ -1,0 +1,1 @@
+See / Edit AGENTS.md INSTEAD.
