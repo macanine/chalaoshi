@@ -31,7 +31,7 @@ pnpm start
 |---|---|---|
 | `CHALAOSHI_WEB_BASE` | `https://dahua309.uk,https://chalaoshi.de` | 网页域，逗号分隔多个，按顺序 failover |
 | `CHALAOSHI_API_BASE` | `https://api.dahua309.uk,https://api.chalaoshi.de` | API 域（评论 / 绩点），同样支持 failover |
-| `CHALAOSHI_TIMEOUT_MS` | `1000` | 上游请求超时（毫秒），短超时让 failover 切换更快 |
+| `CHALAOSHI_TIMEOUT_MS` | `8000` | 上游请求超时（毫秒）；上游实测 3~7s，设 8s 留余量，太短会让每次都超时并熔断域名 |
 | `FAILOVER_COOLDOWN_MS` | `60000` | 域名失败后被熔断的冷却时长（毫秒），冷却后自动恢复 |
 | `CACHE_TTL_SEARCH` | `60` | 搜索结果缓存（秒） |
 | `CACHE_TTL_TEACHER` | `300` | 老师详情缓存（秒） |
@@ -67,7 +67,7 @@ pnpm cf:preview   # 本地 Workers 运行时预览
 pnpm cf:deploy    # 构建并部署到 Cloudflare
 ```
 
-- 环境变量已写在 `wrangler.jsonc` 的 `vars` 里（默认优先 `dahua309.uk`、1s 超时、60s 熔断冷却）；换域名改这里即可，不用动代码。也可在 Cloudflare dashboard 的变量里改。
+- 环境变量已写在 `wrangler.jsonc` 的 `vars` 里（默认优先 `dahua309.uk`、8s 超时、60s 熔断冷却）；换域名改这里即可，不用动代码。也可在 Cloudflare dashboard 的变量里改。
 - 首次部署需 `pnpm exec wrangler login`。
 - 也可以走 Cloudflare 的 Git 集成（Workers Builds）：见 `CLOUDFLARE_DEPLOY.md` 方式 B。
 - 部署后可用 `/api/health?probe=1` 验证：`servedBy` 显示实际响应的域，被拦的域会出现在 `disabled` 里。

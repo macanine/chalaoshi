@@ -46,7 +46,7 @@ function getApiBases(): string[] {
 }
 
 function getTimeoutMs(): number {
-  return Number(process.env.CHALAOSHI_TIMEOUT_MS ?? 1000);
+  return Number(process.env.CHALAOSHI_TIMEOUT_MS ?? 8000);
 }
 
 function getCooldownMs(): number {
@@ -78,9 +78,12 @@ function isDomainLevelStatus(status: number): boolean {
 
 /** 依次尝试多个域名: 跳过已熔断的, 失败即熔断并切下一个, 全部失败才抛错(域名经常换, failover 提升可用性) */
 async function fetchWithFailover(bases: string[], pathAndQuery: string): Promise<string> {
+  // 若所有域名都处于熔断冷却期, 仍按优先级真试一次——否则冷却期内整站一律快速 502,
+  // 且上游恢复后也要等冷却结束才重新纳入, 无法立刻感知(曾因超时熔断所有域名导致整站静默 60s)
+  const probeAll = bases.length > 0 && bases.every((b) => isBaseDisabled(b));
   let lastError: unknown;
   for (const base of bases) {
-    if (isBaseDisabled(base)) continue;
+    if (isBaseDisabled(base) && !probeAll) continue;
     try {
       const res = await fetch(base + pathAndQuery, {
         headers: {
@@ -103,6 +106,7 @@ async function fetchWithFailover(bases: string[], pathAndQuery: string): Promise
         lastError = new UpstreamError('上游返回空内容', 502);
         continue;
       }
+      disabledUntil.delete(base); // 恢复成功, 立即解除该域熔断
       lastServedBase = base;
       return text;
     } catch (e) {

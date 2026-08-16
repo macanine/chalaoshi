@@ -102,11 +102,11 @@ Dashboard → 对应 Worker → **Settings** → **Domains & Routes** → **Add 
 |---|---|---|
 | `CHALAOSHI_WEB_BASE` | `https://dahua309.uk,https://chalaoshi.de` | 网页域,逗号分隔,按顺序 failover |
 | `CHALAOSHI_API_BASE` | `https://api.dahua309.uk,https://api.chalaoshi.de` | API 域(评论/绩点),同样 failover |
-| `CHALAOSHI_TIMEOUT_MS` | `1000` | 单个上游请求超时(ms),短超时让 failover 切换更快 |
+| `CHALAOSHI_TIMEOUT_MS` | `8000` | 单个上游请求超时(ms);上游实测 3~7s,设 8s 留余量——太短会导致每次超时并熔断域名,整站 502 |
 | `FAILOVER_COOLDOWN_MS` | `60000` | 域名失败后被熔断的冷却时长(ms) |
 | `RATE_LIMIT_PER_MIN` | `60` | 每 IP 每分钟 API 上限,`0` 关闭 |
 
-**换上游域名只需改 `wrangler.jsonc` 的 vars(或 Dashboard 变量),不用动代码。** 被拦/超时的域名会自动熔断,冷却后自动恢复。
+**换上游域名只需改 `wrangler.jsonc` 的 vars(或 Dashboard 变量),不用动代码。** 被拦/超时的域名会自动熔断,冷却后自动恢复;所有域名都在冷却期时仍会按优先级真试一次,上游恢复后立刻重新可用。
 
 ## 验证部署
 
@@ -132,7 +132,8 @@ pnpm exec wrangler deployments status --name chalaoshi
 ## 常见问题
 
 **`/api/health?probe=1` 返回 502 或 `upstreamStatus` 非 2xx**
-上游域名被 Cloudflare 拦(403)或不可达。确认本机/Worker 能访问该域,并看 `disabled` 里是否熔断了域名。上游域名经常换,优先去改 `CHALAOSHI_WEB_BASE` / `CHALAOSHI_API_BASE`。
+1. **先看超时**:上游实测 3~7s(搜索页最慢),`CHALAOSHI_TIMEOUT_MS` 必须 ≥8s;设为 1s 这类激进值会导致每次必超时,把所有域名熔断,整站快速 502。
+2. 上游域名被 Cloudflare 拦(403)或不可达:确认本机/Worker 能访问该域,并看 `disabled` 里是否熔断了域名。上游域名经常换,优先去改 `CHALAOSHI_WEB_BASE` / `CHALAOSHI_API_BASE`。
 
 **本地 `preview` / `deploy` 报 `nodejs_compat` 相关错误**
 `wrangler.jsonc` 已带 `nodejs_compat` 兼容标志,一般不会出现;若出现,确认用的是仓库里的 `wrangler.jsonc` 而不是别处拷贝的旧配置。
