@@ -113,7 +113,6 @@ export default function TeacherSearch({ initialQ = '' }: { initialQ?: string }) 
           {loading ? '搜索中…' : '搜索'}
         </button>
       </form>
-      <p className="form-hint">输入即搜 · 回车直达 · 支持名字或拼音</p>
 
       {error && <div className="error-note">{error}</div>}
 

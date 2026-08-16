@@ -16,7 +16,7 @@ export class UpstreamError extends Error {
 }
 
 const UA = 'Mozilla/5.0 (compatible; chalaoshi-web/1.0; +reverse-proxy)';
-const TIMEOUT_MS = Number(process.env.CHALAOSHI_TIMEOUT_MS ?? 20000);
+const TIMEOUT_MS = Number(process.env.CHALAOSHI_TIMEOUT_MS ?? 1000);
 
 const DEFAULTS = { SEARCH: 60, TEACHER: 300, COMMENTS: 60, GPA: 1800 } as const;
 type CacheKind = keyof typeof DEFAULTS;
@@ -36,13 +36,38 @@ function parseBases(env: string | undefined, fallback: string): string[] {
   return [fallback];
 }
 
-const webBases = parseBases(process.env.CHALAOSHI_WEB_BASE, 'https://chalaoshi.de');
-const apiBases = parseBases(process.env.CHALAOSHI_API_BASE, 'https://api.chalaoshi.de');
+const webBases = parseBases(process.env.CHALAOSHI_WEB_BASE, 'https://dahua309.uk,https://chalaoshi.de');
+const apiBases = parseBases(process.env.CHALAOSHI_API_BASE, 'https://api.dahua309.uk,https://api.chalaoshi.de');
 
-/** 依次尝试多个域名, 全部失败才抛错(域名经常换, failover 提升可用性) */
+// ---- 域级故障熔断: 某域名失败(CF 拦截/超时/5xx/空响应)后, 冷却期内跳过它, 冷却结束自动恢复 ----
+const DISABLED_COOLDOWN_MS = Number(process.env.FAILOVER_COOLDOWN_MS ?? 60_000);
+const disabledUntil = new Map<string, number>();
+let lastServedBase: string | null = null;
+
+function isBaseDisabled(base: string): boolean {
+  const until = disabledUntil.get(base);
+  if (until === undefined) return false;
+  if (Date.now() >= until) {
+    disabledUntil.delete(base); // 冷却结束, 重新纳入轮换
+    return false;
+  }
+  return true;
+}
+
+function disableBase(base: string): void {
+  disabledUntil.set(base, Date.now() + DISABLED_COOLDOWN_MS);
+}
+
+/** 该状态码说明"这个域名本身坏了"(Cloudflare 拦截 / 上游故障 / 限流), 应熔断; 404 之类是资源层面, 不熔断 */
+function isDomainLevelStatus(status: number): boolean {
+  return status === 403 || status === 408 || status === 429 || status >= 500;
+}
+
+/** 依次尝试多个域名: 跳过已熔断的, 失败即熔断并切下一个, 全部失败才抛错(域名经常换, failover 提升可用性) */
 async function fetchWithFailover(bases: string[], pathAndQuery: string): Promise<string> {
   let lastError: unknown;
   for (const base of bases) {
+    if (isBaseDisabled(base)) continue;
     try {
       const res = await fetch(base + pathAndQuery, {
         headers: {
@@ -54,12 +79,22 @@ async function fetchWithFailover(bases: string[], pathAndQuery: string): Promise
         cache: 'no-store',
       });
       if (!res.ok) {
-        throw new UpstreamError(`上游返回 HTTP ${res.status} (${res.statusText})`, res.status);
+        const err = new UpstreamError(`上游返回 HTTP ${res.status} (${res.statusText})`, res.status);
+        if (isDomainLevelStatus(res.status)) disableBase(base);
+        lastError = err;
+        continue;
       }
       const text = await res.text();
-      if (!text) throw new UpstreamError('上游返回空内容', 502);
+      if (!text) {
+        disableBase(base);
+        lastError = new UpstreamError('上游返回空内容', 502);
+        continue;
+      }
+      lastServedBase = base;
       return text;
     } catch (e) {
+      // 网络错误 / 超时(AbortSignal.timeout): 域名不可达, 熔断
+      disableBase(base);
       lastError = e;
     }
   }
@@ -203,5 +238,12 @@ export async function courseGpa(course: string): Promise<GpaRow[]> {
 }
 
 export function upstreamConfig() {
-  return { webBases, apiBases, timeoutMs: TIMEOUT_MS };
+  return {
+    webBases,
+    apiBases,
+    timeoutMs: TIMEOUT_MS,
+    cooldownMs: DISABLED_COOLDOWN_MS,
+    disabledBases: [...disabledUntil.keys()].filter((b) => isBaseDisabled(b)),
+    lastServedBase,
+  };
 }

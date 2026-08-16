@@ -60,7 +60,7 @@ lib/
 
 1. **`lib/chalaoshi.ts` 的正则解析直接移植自 `.claude/skills/chalaoshi/scripts/chalaoshi.py`(线上验证过)。不要凭感觉改正则**——改了必须对线上 HTML 重新验证。注释里写着"不要凭感觉改"。
 
-2. **上游域名经常换**。多域名 failover(逗号分隔),换域名只改环境变量,不动代码。
+2. **上游域名经常换**。多域名 failover(逗号分隔),换域名只改环境变量,不动代码。**失败域名自动熔断**: `fetchWithFailover` 对 403(Cloudflare 拦截)/5xx/超时/空响应会禁用该域, 冷却期内跳过, 冷却后自动恢复。默认优先 `dahua309.uk`, `CHALAOSHI_TIMEOUT_MS` 默认 1000ms 让切换更快。
 
 3. **`/api` 永远返回 JSON,`/docs` 才是人类看的渲染版。** 曾在 `/api` 加过 Accept 头判断→重定向到 `/docs`,导致浏览器访问 `/api` 死循环(跳来跳去),**已移除**。以后也不要加这类重定向——AI 与 curl 需要直达 JSON,文档页靠导航指向 `/docs`。
 

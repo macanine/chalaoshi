@@ -112,7 +112,6 @@ export default function CourseSearch({ initialCourse = '' }: { initialCourse?: s
           {loading ? '查询中…' : '查询'}
         </button>
       </form>
-      <p className="form-hint">输入即查 · 回车直达 · 支持课程名模糊匹配</p>
 
       {error && <div className="error-note">{error}</div>}
 

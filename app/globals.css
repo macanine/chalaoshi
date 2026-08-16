@@ -197,12 +197,6 @@ textarea {
   letter-spacing: 0.5px;
 }
 
-.subtitle {
-  color: var(--muted);
-  font-size: 15px;
-  margin: 0;
-}
-
 /* ------------------------------------------------ search */
 .search-form {
   display: flex;
@@ -281,13 +275,6 @@ textarea {
 .search-form button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-}
-
-.form-hint {
-  margin: 10px 0 0;
-  text-align: center;
-  color: var(--muted);
-  font-size: 12px;
 }
 
 /* ------------------------------------------------ cards / panels */
@@ -872,10 +859,6 @@ table.gpa tr:last-child td {
 
   .hero h1 {
     font-size: 24px;
-  }
-
-  .subtitle {
-    font-size: 14px;
   }
 
   .search-form {

@@ -3,7 +3,7 @@
 浙江大学「查老师」(chalaoshi.de) 匿名教评系统的反向代理镜像：抓取上游 HTML 解析为结构化 JSON，并提供搜索 / 详情 / 评论 / 绩点查询的前端界面。
 
 - 纯 Next.js 15 + React 19 + TypeScript，零其他运行时依赖
-- 服务端内存缓存 + 滑动窗口限流，多域名自动 failover
+- 服务端内存缓存 + 滑动窗口限流，多域名 failover，失败域名自动熔断冷却后恢复
 - 响应式 UI，明暗双主题，支持 PWA
 
 ## 快速开始
@@ -27,9 +27,10 @@ npm start
 
 | 变量 | 默认 | 说明 |
 |---|---|---|
-| `CHALAOSHI_WEB_BASE` | `https://chalaoshi.de` | 网页域，逗号分隔多个，按顺序 failover |
-| `CHALAOSHI_API_BASE` | `https://api.chalaoshi.de` | API 域（评论 / 绩点），同样支持 failover |
-| `CHALAOSHI_TIMEOUT_MS` | `20000` | 上游请求超时（毫秒） |
+| `CHALAOSHI_WEB_BASE` | `https://dahua309.uk,https://chalaoshi.de` | 网页域，逗号分隔多个，按顺序 failover |
+| `CHALAOSHI_API_BASE` | `https://api.dahua309.uk,https://api.chalaoshi.de` | API 域（评论 / 绩点），同样支持 failover |
+| `CHALAOSHI_TIMEOUT_MS` | `1000` | 上游请求超时（毫秒），短超时让 failover 切换更快 |
+| `FAILOVER_COOLDOWN_MS` | `60000` | 域名失败后被熔断的冷却时长（毫秒），冷却后自动恢复 |
 | `CACHE_TTL_SEARCH` | `60` | 搜索结果缓存（秒） |
 | `CACHE_TTL_TEACHER` | `300` | 老师详情缓存（秒） |
 | `CACHE_TTL_COMMENTS` | `60` | 评论缓存（秒） |
