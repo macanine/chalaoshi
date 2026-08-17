@@ -17,11 +17,13 @@ export default function CourseSearch({ initialCourse = '' }: { initialCourse?: s
 
   const composingRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const requestRef = useRef<AbortController | null>(null);
   const seqRef = useRef(0);
 
   const runSearch = useCallback(async (kw: string) => {
     const key = `gpa:${kw}`;
     const cached = clientCacheGet<GpaRow[]>(key);
+    requestRef.current?.abort();
     const seq = ++seqRef.current;
 
     setLoading(true);
@@ -32,8 +34,10 @@ export default function CourseSearch({ initialCourse = '' }: { initialCourse?: s
       setLoading(false);
       return;
     }
+    const controller = new AbortController();
+    requestRef.current = controller;
     try {
-      const res = await fetch('/api/gpa?course=' + encodeURIComponent(kw));
+      const res = await fetch('/api/gpa?course=' + encodeURIComponent(kw), { signal: controller.signal });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || '查询失败');
       const list = data.rows ?? [];
@@ -42,10 +46,14 @@ export default function CourseSearch({ initialCourse = '' }: { initialCourse?: s
       setRows(list);
     } catch (err) {
       if (seq !== seqRef.current) return;
+      if (err instanceof DOMException && err.name === 'AbortError') return;
       setError(err instanceof Error ? err.message : '查询失败');
       setRows([]);
     } finally {
-      if (seq === seqRef.current) setLoading(false);
+      if (seq === seqRef.current) {
+        requestRef.current = null;
+        setLoading(false);
+      }
     }
   }, []);
 
@@ -60,17 +68,21 @@ export default function CourseSearch({ initialCourse = '' }: { initialCourse?: s
 
   useEffect(() => () => {
     if (timerRef.current) clearTimeout(timerRef.current);
+    requestRef.current?.abort();
+    seqRef.current += 1;
   }, []);
 
   function onInput(v: string) {
     setCourse(v);
     if (timerRef.current) clearTimeout(timerRef.current);
+    requestRef.current?.abort();
+    seqRef.current += 1;
+    setLoading(false);
+    setRows(null);
+    setSearched('');
+    setError(null);
     const kw = v.trim();
     if (!kw) {
-      setRows(null);
-      setSearched('');
-      setError(null);
-      setLoading(false);
       return;
     }
     if (composingRef.current) return;

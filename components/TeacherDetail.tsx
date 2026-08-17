@@ -19,6 +19,7 @@ export default function TeacherDetail({ tid }: { tid: string }) {
 
   useEffect(() => {
     let alive = true;
+    const controller = new AbortController();
     const key = `teacher:${tid}`;
     const cached = clientCacheGet<TeacherDetailData>(key);
 
@@ -30,7 +31,7 @@ export default function TeacherDetail({ tid }: { tid: string }) {
       }
       setState({ status: 'loading' });
       try {
-        const res = await fetch(`/api/teacher/${tid}`);
+        const res = await fetch(`/api/teacher/${tid}`, { signal: controller.signal });
         const data = await res.json().catch(() => ({}));
         if (!alive) return;
         if (!res.ok) {
@@ -40,14 +41,16 @@ export default function TeacherDetail({ tid }: { tid: string }) {
         clientCacheSet(key, data, CACHE_TTL_MS);
         setState({ status: 'ready', d: data });
         document.title = `${data.name} · ${data.college} · 查老师`;
-      } catch {
+      } catch (err) {
         if (!alive) return;
+        if (err instanceof DOMException && err.name === 'AbortError') return;
         setState({ status: 'error', message: '网络异常, 请重试', is404: false });
       }
     })();
 
     return () => {
       alive = false;
+      controller.abort();
     };
   }, [tid]);
 
@@ -162,7 +165,7 @@ export default function TeacherDetail({ tid }: { tid: string }) {
         </section>
       )}
 
-      <CommentSection tid={tid} />
+      <CommentSection key={tid} tid={tid} />
     </>
   );
 }

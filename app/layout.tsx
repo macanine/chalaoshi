@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import Link from 'next/link';
 import './globals.css';
 import BottomNav from '@/components/BottomNav';
 
@@ -38,13 +39,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <header className="site-header">
           <div className="container header-inner">
-            <a className="brand" href="/" aria-label="查老师首页">
+            <Link className="brand" href="/" aria-label="查老师首页">
               查<span>老师</span>
-            </a>
+            </Link>
             <nav className="nav" aria-label="主导航">
-              <a href="/">查老师</a>
-              <a href="/course">查课程绩点</a>
-              <a href="/docs">API</a>
+              <Link href="/">查老师</Link>
+              <Link href="/course">查课程绩点</Link>
+              <Link href="/docs">API</Link>
             </nav>
             <a
               className="github-link"

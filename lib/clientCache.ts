@@ -4,6 +4,14 @@
  */
 
 const store = new Map<string, { value: unknown; expires: number }>();
+const MAX_ENTRIES = 100;
+
+function pruneExpired(now = Date.now()): void {
+  for (const [key, entry] of store) {
+    if (entry.expires >= now) continue;
+    store.delete(key);
+  }
+}
 
 export function clientCacheGet<T>(key: string): T | undefined {
   const hit = store.get(key);
@@ -16,5 +24,18 @@ export function clientCacheGet<T>(key: string): T | undefined {
 }
 
 export function clientCacheSet<T>(key: string, value: T, ttlMs = 2 * 60 * 1000): void {
-  store.set(key, { value, expires: Date.now() + ttlMs });
+  if (!Number.isFinite(ttlMs) || ttlMs <= 0) {
+    store.delete(key);
+    return;
+  }
+
+  const now = Date.now();
+  pruneExpired(now);
+  store.delete(key);
+  while (store.size >= MAX_ENTRIES) {
+    const oldest = store.keys().next().value;
+    if (oldest === undefined) break;
+    store.delete(oldest);
+  }
+  store.set(key, { value, expires: now + ttlMs });
 }

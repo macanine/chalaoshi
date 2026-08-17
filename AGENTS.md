@@ -1,110 +1,133 @@
-# AGENTS.md — 查老师 web 镜像(开发指南)
+# AGENTS.md
 
-浙江大学「查老师」(chalaoshi.de) 匿名教评系统的**反向代理镜像**。抓取上游 HTML 解析为结构化 JSON,提供老师搜索/详情/评论/课程绩点,前端为响应式 SPA 风格 UI。
+## 项目契约
 
-> 供 AI agent 与开发者阅读。改代码前先读这份,尤其「关键约定」一节。
+这是浙江大学「查老师」(`chalaoshi.de`) 的非官方镜像。它把上游 HTML 解析为结构化 JSON，并提供老师搜索、老师详情、评论与课程绩点的响应式 Web UI。
 
-## 技术栈
+本文件适用于仓库内的全部修改。修改前先读相关实现；不要基于文件名、旧文档或页面外观猜测运行行为。
 
-- **Next.js 15(App Router)+ React 19 + TypeScript**,零其他运行时依赖
-- 包管理:**pnpm**(`package.json` 的 `packageManager` 字段钉死版本,**不要用 npm/yarn 新增或安装依赖**——它们的 lockfile 会污染项目)
-- 服务端: Route Handlers 做 API;内存缓存 + 滑动窗口限流
-- 前端: 全客户端组件实现 SPA 式体验(无第三方 UI 库)
-- 部署: **OpenNext Cloudflare** 编译成单个 Worker 跑在 Cloudflare Workers 上,见 `CLOUDFLARE_DEPLOY.md`
-- 设计系统: `app/globals.css` 里的 CSS 变量(明/暗双主题),所有组件共用
+## 技术边界
 
-## 目录结构
+- Next.js 15 App Router、React 19、TypeScript，运行时不引入第三方依赖。
+- 只使用 `pnpm`。不得使用 npm 或 yarn，也不得产生它们的 lockfile。
+- API 由 Route Handler 提供；缓存、限流和 CORS 统一由 `lib/` 处理。
+- 前端以客户端组件提供 SPA 体验；不引入 UI 库。
+- 部署目标为 OpenNext Cloudflare Worker。部署细节见 `CLOUDFLARE_DEPLOY.md`。
+- 生产数据来自匿名评价和「课否」，存在幸存者偏差与时效性。UI 文案不得把数据表达成事实保证。
 
-```
+## 目录与职责
+
+```text
 app/
-  layout.tsx          全局壳: 顶栏毛玻璃 header / main / 底部 tab(BottomNav) / 毛玻璃 footer
-  page.tsx            首页(查老师): 读 searchParams.q 传给 TeacherSearch 做直达搜索
-  course/page.tsx     查课程绩点
-  teacher/[tid]/page.tsx  老师详情——薄服务端包装, 只把 tid 交给客户端组件
-  docs/page.tsx       API 渲染版文档(/docs), 人类看的
-  manifest.ts         PWA manifest
-  globals.css         设计 tokens + 全部样式
-  api/                Route Handlers(见下)
+  api/                    JSON Route Handlers
+  page.tsx                老师搜索首页，透传 ?q=
+  course/page.tsx         课程绩点页，透传 ?course=
+  teacher/[tid]/page.tsx  仅传递 tid 的薄页面包装
+  docs/                   人类可读 API 文档；/api 始终是 JSON
+  layout.tsx              全局壳、导航、页脚
+  globals.css             全站 tokens 与样式
 components/
-  TeacherSearch.tsx   查老师: 防抖即搜 + 输入法处理 + 客户端缓存
-  CourseSearch.tsx    查课程: 同上
-  TeacherDetail.tsx   详情页主体: 客户端拉 /api/teacher/<tid>, 骨架屏加载
-  CommentSection.tsx  评论: 每排序独立缓存 + 后台预取 + 无限滚动
-  TeacherCard.tsx     搜索结果卡片
-  ScoreBadge.tsx      评分色阶(导出纯函数 scoreClass 供复用)
-  GpaTable.tsx        绩点表(移动端 CSS 变卡片), 老师名链到 /?q=
-  BottomNav.tsx       移动端底部 tab 栏
-  ApiDocsClient.tsx   /docs 上的「基础 URL + 复制给 AI 提示词」
+  TeacherSearch.tsx       老师即时搜索
+  CourseSearch.tsx        课程即时搜索
+  TeacherDetail.tsx       客户端拉取详情与骨架屏
+  CommentSection.tsx      评论排序、预取和无限滚动
+  GpaTable.tsx            课程绩点表
 lib/
-  chalaoshi.ts        核心: 抓上游 HTML + 正则解析 + 多域名 failover
-  types.ts            结构化类型(与上游 HTML 一一对应)
-  cache.ts            内存 TTL 缓存(挂 globalThis 跨 HMR 复用)
-  ratelimit.ts        滑动窗口限流
-  http.ts             json() 带 CORS / 限流 / 错误映射
-  apiEndpoints.ts     端点清单——/api 索引与 /docs 复制按钮共用同一份
-  clientCache.ts      客户端会话缓存(搜索结果等)
+  chalaoshi.ts            上游请求、熔断、缓存和 HTML 解析
+  http.ts                 JSON、CORS、限流与错误映射
+  cache.ts                有界服务端 TTL 缓存
+  clientCache.ts          有界会话缓存
+  ratelimit.ts            有界滑动窗口限流
+  types.ts                API 结构类型
+  apiEndpoints.ts         /api 与 /docs 共用的端点清单
 ```
 
-## 服务端 API
+## 不可破坏的规则
 
-| 端点 | 说明 |
-|---|---|
-| `GET /api/search?q=` | 老师候选(tid/name/college/score) |
-| `GET /api/teacher/<tid>` | 详情(评分/点名率/评论数/课程绩点) |
-| `GET /api/comments/<tid>?sort=&limit=&offset=` | 评论, 分页, 返回 total/hasMore |
-| `GET /api/gpa?course=` | 该课各老师平均绩点 |
-| `GET /api/health[?probe=1]` | 存活/上游探测 |
-| `GET /api` | 端点索引(纯 JSON) |
+### 上游与解析
 
-所有 API: `dynamic = 'force-dynamic'`,统一走 `enforceRateLimit(req)` + `handleError(e)` + `json()`(自动带 CORS)。错误体 `{ error, upstreamStatus? }`;404=老师不存在,429=限流(带 `retryAfter`),502=上游不可达。
+1. `lib/chalaoshi.ts` 的 HTML 正则已用真实上游页面验证。不要凭感觉调整解析正则；任何改动都必须拿真实 HTML 重新验证搜索、详情、评论和绩点的结果。
+2. 上游域名只能通过环境变量调整，不能硬编码替换代码默认策略。`CHALAOSHI_WEB_BASE`、`CHALAOSHI_API_BASE` 与 `CHALAOSHI_FALLBACK` 都是逗号分隔列表。
+3. 主域名失败时维持既有 failover：403、408、429、5xx、超时和空响应会熔断该域；冷却期跳过；所有域都冷却时仍按优先级探测一次；成功立即解除熔断。404 是资源不存在，不应触发 fallback。
+4. 上游实测响应通常为 3 至 7 秒。`CHALAOSHI_TIMEOUT_MS` 默认 8000，不能为了“更快”设置为 1 秒这类会持续熔断的值。
+5. 相同缓存键的上游请求必须单飞；不得移除 `cached()` / `inFlight` 保护，也不得将有界缓存改回无上限 Map。
 
-## 关键约定(改代码前必读)
+### API
 
-1. **`lib/chalaoshi.ts` 的正则解析已对照线上 HTML 验证过**。不要凭感觉改正则——改了必须对线上 HTML 重新验证。注释里写着"不要凭感觉改"。
+1. `/api` 永远返回 JSON，绝不根据 `Accept` 跳转到 `/docs`。`/docs` 才是人类阅读的页面。
+2. 所有 Route Handler 都必须 `export const dynamic = 'force-dynamic'`，并在执行逻辑前调用 `enforceRateLimit(req)`。
+3. 通过 `json()` 返回响应，保证 CORS 一致；可抛出的上游调用放入 `try/catch` 并经 `handleError()` 映射。
+4. 动态参数先验证再请求上游。老师 `tid` 必须为数字；搜索词和课程名必须保持长度上限。
+5. 新端点必须同步更新 `lib/types.ts`、`lib/apiEndpoints.ts`、`/docs`，并遵循现有错误体：`{ error, upstreamStatus? }`。429 必须保留 `Retry-After`。
+6. `/api/health?probe=1` 会访问上游，只可作为受限探测，不要将其改成未受保护的重请求接口。
 
-2. **上游域名经常换**。多域名 failover(逗号分隔),换域名只改环境变量,不动代码。**失败域名自动熔断**: `fetchWithFailover` 对 403(Cloudflare 拦截)/5xx/超时/空响应会禁用该域, 冷却期内跳过, 冷却后自动恢复; **若所有域都在冷却期则仍按优先级真试一次**(防止整站静默快速 502 且无法感知上游恢复), 某域恢复成功立即解除其熔断。默认优先 `dahua309.uk`, `CHALAOSHI_TIMEOUT_MS` 默认 8000ms——上游实测 3~7s, **别把超时设成 1s 这类激进值**(曾导致每次必超时、把所有域名熔断、整站 502 60s)。**整站同类服务兜底**: `CHALAOSHI_FALLBACK`(逗号分隔, 默认空)在主域名列表全部失败(被拦/超时/5xx, 404 除外)后作为最后一层再试一次, 兜底站须返回与上游同样结构的 HTML/JSON(通常是本项目在另一平台的部署或镜像站); 兜底也走同一套熔断与冷却。
+### Cloudflare 与配置
 
-3. **`/api` 永远返回 JSON,`/docs` 才是人类看的渲染版。** 曾在 `/api` 加过 Accept 头判断→重定向到 `/docs`,导致浏览器访问 `/api` 死循环(跳来跳去),**已移除**。以后也不要加这类重定向——AI 与 curl 需要直达 JSON,文档页靠导航指向 `/docs`。
+1. 环境变量只可在请求时读取。Cloudflare Worker 的 `process.env` 填充晚于模块加载，禁止模块级读取配置。
+2. `next dev` 不会把 `wrangler.jsonc` 的 vars 填入 `process.env`；本地差异写入 `.env.local`。`wrangler.jsonc` 用于部署和 `cf:preview`。
+3. 配置值必须校验有限性和合理范围，尤其是 TTL、超时、冷却期与每分钟限流。
+4. 不要改为 Next 数据缓存或上游 `fetch` 缓存。该项目依靠显式内存 TTL 缓存和 `cache: 'no-store'` 控制陈旧数据。
 
-4. **SPA 体验是硬需求**(查得快)。老师详情页是薄服务端包装 + 客户端 `TeacherDetail` 拉数据 + 骨架屏。**不要**在 `/teacher/[tid]` 页做同步上游 fetch(会阻塞导航,变回慢加载)。
+### SPA 与数据加载
 
-5. **搜索要"输入即搜"**: 300ms 防抖 + 处理中文输入法组合(compositionstart/end 期间不触发)+ 客户端缓存(`lib/clientCache.ts`)。改搜索逻辑时保持这三点。
+1. `app/teacher/[tid]/page.tsx` 必须保持薄包装。老师详情由 `TeacherDetail` 客户端请求并显示骨架屏，禁止在页面服务端同步抓上游。
+2. 站内跳转使用 `next/link`；仅外链或明确要求新标签页时使用 `<a>`。
+3. 搜索必须保留 300ms 防抖、中文输入法 composition 保护、客户端缓存和旧请求取消/序列防护。清空或改词后不得显示过期结果。
+4. 详情页与搜索页的离开/新请求必须取消未完成的浏览器请求，避免过期状态回写。
+5. 评论的两种排序分别缓存；首次加载后后台预取另一种；同一页请求单飞；切换时保留已显示的评论，不能整块闪烁。老师 `tid` 改变时评论状态必须重置。
 
-6. **评论切换(最新/人气)必须顺滑**: 每种排序在 `pages` ref 里独立缓存、首次加载后后台预取另一种排序、单飞(`busyRef`)防竞态、切换时保留当前列表不整块闪烁。这是用户明确要求过的性能点。
+### 设计与可访问性
 
-7. **移动端是第一优先**: 触摸目标 ≥44px、输入框字号 ≥16px(防 iOS 聚焦缩放)、`env(safe-area-inset-*)` 处理刘海屏、底部 tab 栏(`BottomNav`,≤768px 显示)、绩点表在手机上变卡片。页面改动记得在 ≤390px 宽度下检查。
+1. 移动端优先：交互目标至少 44px，输入框字号至少 16px，处理 `safe-area-inset-*`，并在不超过 390px 宽度下检查布局。
+2. 全站宽度只使用 `.container`：`max-width: 600px` 加流式边距。禁止局部加宽或额外 `max-width` 与它冲突。
+3. 头部和页脚维持毛玻璃 sticky 布局；移动端页脚必须高于底部导航。`body` 保持 `flex` 列布局与 `min-height: 100dvh`。
+4. 颜色、圆角、阴影只使用 `app/globals.css` 的设计 tokens。半透明层使用现有 `rgba()` tokens，禁止使用 `color-mix()`。
+5. 骨架屏的短文本使用接近真实内容的固定像素宽度，例如姓名约 100px、学院约 190px；仅长段内容可用百分比。
+6. 保持明暗主题、`prefers-reduced-motion`、可见焦点、语义标签和移动端绩点卡片布局。
 
-8. **顶栏/页脚是固定的毛玻璃条**: header sticky top / footer sticky bottom,`blur(18px) saturate(170%)` + 半透明底;footer 在移动端要抬到 tab 栏上方(`bottom: calc(56px + safe-area)`)。`body` 是 `flex column min-height:100dvh`,`main` 撑满。
+## 常见任务
 
-9. **设计 tokens 在 `globals.css` `:root` + `@media (prefers-color-scheme: dark)`**,颜色/圆角/阴影一律用变量,不要硬编码。**半透明层(毛玻璃底/边框/焦点环/骨架屏闪光)用 `rgba()` 变量(`--glass-bg`/`--glass-border`/`--nav-bg`/`--accent-ring`/`--red-bg`/`--shimmer`),不要用 `color-mix()`**——它在不支持的浏览器里会让背景直接失效变透明,出过兼容性事故。
+### 新增查询维度
 
-10. **首页支持 `/?q=名字` 直达**(从绩点表点老师名跳过来)。`page.tsx` 读 `searchParams` 传给 `TeacherSearch initialQ`。
+1. 在 `lib/types.ts` 定义输出结构。
+2. 在 `lib/chalaoshi.ts` 实现上游请求和已验证的解析。
+3. 新增 API 路由，接入动态渲染、限流、JSON 和错误映射。
+4. 更新 `lib/apiEndpoints.ts` 与 `/docs`。
+5. 最后增加客户端组件，并遵守本文件的数据加载和移动端规则。
 
-11. **宽度系统是全站唯一的——全局 600px**: 所有页面共用 `.container`(`max-width: 600px` + `clamp(16px, 4vw, 28px)` 流式边距),搜索页、详情页、文档页全是一个窄栏,顶栏/内容/页脚自动对齐。这是用户反复斟酌后的明确决定(曾试过 1100/1280 全宽,被打回)。**禁止给任何元素另设与容器冲突的 `max-width` 或局部加宽**。
+### 调整 UI
 
-12. **骨架屏宽度要对齐真实内容,不要用容器百分比**: 中文字很短,姓名条用 `40%` 在宽容器里会变成 400px 的巨杠,和真实的 80px 名字严重不符。姓名/学院/统计等短内容一律用**固定像素宽**(姓名 ~100px、学院 ~190px),评论这种整段长文才可以用百分比。`.skeleton` 基类带 `width: 100%` 兜底,不会塌陷。
+- 优先修改 `app/globals.css`，复用既有 class 与 tokens。
+- 不要为了小改动重排组件层级或引入新设计系统。
+- 改动搜索、详情、评论或绩点时，分别检查 loading、error、empty、缓存命中和窄屏状态。
 
-13. **环境变量惰性读取**: 不要在模块加载时读 `process.env`——Cloudflare 的 env→`process.env` 填充(`populateProcessEnv`)发生在 worker 初始化后, 模块级读取会拿到空值而落到默认值。一律在请求时读, `lib/chalaoshi.ts` 的 `getWebBases()`/`getTimeoutMs()` 就是样板。**注意**: `initOpenNextCloudflareForDev()` 只把 vars 放进 `getCloudflareContext()`, **不会填充 `process.env`**, 所以 `next dev` 用的是代码默认值或 `.env.local`; 若要 dev 与线上不同, 用 `.env.local` 覆盖(wrangler.jsonc 只作用于部署/`cf:preview`)。`parseBases` 对 env 和 fallback 都按逗号拆(漏拆会把 `a.com,b.com` 当单个域名, 必 502)。
+### 改动上游逻辑
 
-## 开发命令
+- 先保存或复现真实上游响应，再改正则。
+- 检查多域 failover、fallback、熔断恢复、超时和缓存命中路径。
+- 上游异常必须转为稳定 API 错误，不得直接把 HTML 或原始 fetch 异常响应给客户端。
+
+## 验证与交付
 
 ```bash
-pnpm dev      # 开发, http://localhost:3000 (本机占用时 Next 会换端口, 看日志)
-pnpm build    # 生产构建(兼做类型检查)
-pnpm start    # 生产启动
-pnpm cf:build     # OpenNext Cloudflare 构建(.open-next/)
-pnpm cf:preview   # 本地 Workers 运行时预览
-pnpm cf:deploy    # 构建并部署到 Cloudflare Workers
+pnpm exec tsc --noEmit
+pnpm build
+pnpm cf:build
 ```
 
-环境变量见 `.env.example`(本地 dev 用 `.env.local`) 与 `wrangler.jsonc` 的 `vars`(CF 部署用)。运行机器需能访问上游域(通常要科学上网)。完整部署流程见 `CLOUDFLARE_DEPLOY.md`。
+- 纯前端改动至少做类型检查和窄屏检查。
+- API、缓存、限流或解析改动至少做类型检查，并验证受影响端点的成功、参数错误、上游失败与缓存路径。
+- Cloudflare 相关改动执行 `pnpm cf:build`；部署前看 `CLOUDFLARE_DEPLOY.md`。
+- 工作区可能已有用户改动。只修改与任务有关的文件，不回退或格式化无关变更。
+- 无法执行验证时，明确说明原因和未验证的范围。
 
-## 常见改动路径
+## 常用命令
 
-- **加一个查询维度**: 在 `lib/chalaoshi.ts` 加解析函数 → 加 `/api` 路由(套 `enforceRateLimit`+`handleError`+`json`)→ 加 `lib/types.ts` 类型 → 加组件;若在端点清单里就同步更新 `lib/apiEndpoints.ts`。
-- **调 UI**: 只动 `globals.css` 的变量与选择器,尽量不改组件结构;新样式组件优先复用已有 class。
-- **改数据解析**: 先对着线上真实 HTML 验证再改,并保留缓存/限流。
-
-## 数据说明
-
-数据来自 chalaoshi.de 匿名用户与「课否」,存在幸存者偏差,给分有时效性——判断"给分捞不捞"建议以**近期评论**为准(`sort=time`),并核对课程名是否与所问一致。
+```bash
+pnpm dev          # Next 本地开发
+pnpm build        # Next 生产构建与类型检查
+pnpm start        # 运行生产构建
+pnpm cf:build     # OpenNext Cloudflare 构建
+pnpm cf:preview   # 本地 Worker 预览
+pnpm cf:deploy    # 构建并部署 Worker
+```

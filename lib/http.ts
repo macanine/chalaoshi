@@ -4,8 +4,6 @@ import { NextResponse } from 'next/server';
 import { UpstreamError } from './chalaoshi';
 import { rateLimit } from './ratelimit';
 
-const RATE_LIMIT_PER_MIN = Number(process.env.RATE_LIMIT_PER_MIN ?? 60);
-
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, OPTIONS',
@@ -21,12 +19,22 @@ export function json(data: unknown, init?: number | ResponseInit): NextResponse 
 }
 
 function clientKey(req: Request): string {
-  return req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'local';
+  return (
+    req.headers.get('cf-connecting-ip') ||
+    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    'local'
+  );
+}
+
+function rateLimitPerMinute(): number {
+  const value = Number(process.env.RATE_LIMIT_PER_MIN ?? 60);
+  return Number.isFinite(value) && value >= 0 ? Math.floor(value) : 60;
 }
 
 export function enforceRateLimit(req: Request): { ok: true } | { ok: false; res: NextResponse } {
-  if (RATE_LIMIT_PER_MIN <= 0) return { ok: true };
-  const r = rateLimit(clientKey(req), RATE_LIMIT_PER_MIN, 60_000);
+  const limit = rateLimitPerMinute();
+  if (limit <= 0) return { ok: true };
+  const r = rateLimit(clientKey(req), limit, 60_000);
   if (r.allowed) return { ok: true };
   return {
     ok: false,

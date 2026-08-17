@@ -11,6 +11,7 @@ export async function GET(req: NextRequest) {
 
   const q = req.nextUrl.searchParams.get('q')?.trim();
   if (!q) return json({ error: '参数缺失: 需要 q (老师姓名或拼音)' }, { status: 400 });
+  if (q.length > 100) return json({ error: 'q 最长为 100 个字符' }, { status: 400 });
 
   try {
     const teachers = await searchTeachers(q);

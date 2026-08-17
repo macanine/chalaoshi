@@ -1,12 +1,15 @@
 import { API_ENDPOINTS } from '@/lib/apiEndpoints';
 import { upstreamConfig } from '@/lib/chalaoshi';
-import { json } from '@/lib/http';
+import { enforceRateLimit, json } from '@/lib/http';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60; // Vercel: 上游抓取可能超过默认 10s, 放宽到 60s
 
 /** API 索引: 结构化 JSON, 直接给 AI / 开发者用。人类看的渲染版在 /docs。 */
-export function GET() {
+export function GET(req: Request) {
+  const rl = enforceRateLimit(req);
+  if (!rl.ok) return rl.res;
+
   const { webBases, apiBases, disabledBases } = upstreamConfig();
   return json({
     name: 'chalaoshi-web API',

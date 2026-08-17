@@ -1,8 +1,17 @@
 /** 极简滑动窗口限流, 保护上游 chalaoshi.de */
 
-type Window = { timestamps: number[] };
+type Window = { timestamps: number[]; lastSeen: number };
 
 const windows = new Map<string, Window>();
+const MAX_CLIENTS = 5_000;
+let nextPruneAt = 0;
+
+function pruneWindows(now: number, windowMs: number): void {
+  for (const [key, win] of windows) {
+    if (win.lastSeen > now - windowMs) continue;
+    windows.delete(key);
+  }
+}
 
 export function rateLimit(
   key: string,
@@ -10,11 +19,21 @@ export function rateLimit(
   windowMs: number
 ): { allowed: boolean; remaining: number; retryAfter: number } {
   const now = Date.now();
+  if (now >= nextPruneAt) {
+    pruneWindows(now, windowMs);
+    nextPruneAt = now + Math.min(windowMs, 60_000);
+  }
   let win = windows.get(key);
   if (!win) {
-    win = { timestamps: [] };
+    while (windows.size >= MAX_CLIENTS) {
+      const oldest = windows.keys().next().value;
+      if (oldest === undefined) break;
+      windows.delete(oldest);
+    }
+    win = { timestamps: [], lastSeen: now };
     windows.set(key, win);
   }
+  win.lastSeen = now;
   while (win.timestamps.length && win.timestamps[0] <= now - windowMs) {
     win.timestamps.shift();
   }

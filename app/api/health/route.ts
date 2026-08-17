@@ -1,12 +1,15 @@
 import { cacheSize } from '@/lib/cache';
 import { searchTeachers, upstreamConfig } from '@/lib/chalaoshi';
-import { json } from '@/lib/http';
+import { enforceRateLimit, json } from '@/lib/http';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60; // Vercel: 上游探测可能超过默认 10s, 放宽到 60s
 
 /** 健康检查: 默认本地信息; ?probe=1 时真实走一次搜索(经过 failover + 熔断) */
 export async function GET(req: Request) {
+  const rl = enforceRateLimit(req);
+  if (!rl.ok) return rl.res;
+
   const url = new URL(req.url);
   const probe = url.searchParams.get('probe') === '1';
   const { webBases, apiBases, fallbackBases, disabledBases, lastServedBase } = upstreamConfig();

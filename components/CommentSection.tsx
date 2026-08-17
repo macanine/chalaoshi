@@ -38,13 +38,24 @@ export default function CommentSection({
   const busyRef = useRef(false);
   const seqRef = useRef(0);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const requestsRef = useRef(new Map<string, Promise<PageState>>());
 
   const loadPage = useCallback(
-    async (s: CommentSort, off: number): Promise<PageState> => {
-      const res = await fetch(`/api/comments/${tid}?sort=${s}&limit=${PAGE}&offset=${off}`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || '加载失败');
-      return { comments: data.comments ?? [], total: data.total ?? 0, offset: off + (data.comments ?? []).length };
+    (s: CommentSort, off: number): Promise<PageState> => {
+      const key = `${s}:${off}`;
+      const pending = requestsRef.current.get(key);
+      if (pending) return pending;
+
+      const request = (async () => {
+        const res = await fetch(`/api/comments/${tid}?sort=${s}&limit=${PAGE}&offset=${off}`);
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || '加载失败');
+        const comments: Comment[] = data.comments ?? [];
+        return { comments, total: data.total ?? 0, offset: off + comments.length };
+      })();
+      requestsRef.current.set(key, request);
+      void request.finally(() => requestsRef.current.delete(key)).catch(() => {});
+      return request;
     },
     [tid]
   );

@@ -17,11 +17,13 @@ export default function TeacherSearch({ initialQ = '' }: { initialQ?: string }) 
 
   const composingRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const requestRef = useRef<AbortController | null>(null);
   const seqRef = useRef(0);
 
   const runSearch = useCallback(async (kw: string) => {
     const key = `search:${kw}`;
     const cached = clientCacheGet<TeacherHit[]>(key);
+    requestRef.current?.abort();
     const seq = ++seqRef.current;
 
     setLoading(true);
@@ -32,8 +34,10 @@ export default function TeacherSearch({ initialQ = '' }: { initialQ?: string }) 
       setLoading(false);
       return;
     }
+    const controller = new AbortController();
+    requestRef.current = controller;
     try {
-      const res = await fetch('/api/search?q=' + encodeURIComponent(kw));
+      const res = await fetch('/api/search?q=' + encodeURIComponent(kw), { signal: controller.signal });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || '查询失败');
       const list = data.teachers ?? [];
@@ -42,10 +46,14 @@ export default function TeacherSearch({ initialQ = '' }: { initialQ?: string }) 
       setTeachers(list);
     } catch (err) {
       if (seq !== seqRef.current) return;
+      if (err instanceof DOMException && err.name === 'AbortError') return;
       setError(err instanceof Error ? err.message : '查询失败');
       setTeachers([]);
     } finally {
-      if (seq === seqRef.current) setLoading(false);
+      if (seq === seqRef.current) {
+        requestRef.current = null;
+        setLoading(false);
+      }
     }
   }, []);
 
@@ -60,17 +68,21 @@ export default function TeacherSearch({ initialQ = '' }: { initialQ?: string }) 
 
   useEffect(() => () => {
     if (timerRef.current) clearTimeout(timerRef.current);
+    requestRef.current?.abort();
+    seqRef.current += 1;
   }, []);
 
   function onInput(v: string) {
     setQ(v);
     if (timerRef.current) clearTimeout(timerRef.current);
+    requestRef.current?.abort();
+    seqRef.current += 1;
+    setLoading(false);
+    setTeachers(null);
+    setSearched('');
+    setError(null);
     const kw = v.trim();
     if (!kw) {
-      setTeachers(null);
-      setSearched('');
-      setError(null);
-      setLoading(false);
       return;
     }
     // 输入法组合期间不触发, 等 compositionend 再搜

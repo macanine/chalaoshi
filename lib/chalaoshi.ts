@@ -19,10 +19,30 @@ const UA = 'Mozilla/5.0 (compatible; chalaoshi-web/1.0; +reverse-proxy)';
 
 const DEFAULTS = { SEARCH: 60, TEACHER: 300, COMMENTS: 60, GPA: 1800 } as const;
 type CacheKind = keyof typeof DEFAULTS;
+const inFlight = new Map<string, Promise<unknown>>();
 
 function ttlSeconds(kind: CacheKind): number {
   const v = Number(process.env[`CACHE_TTL_${kind}`]);
-  return Number.isFinite(v) && v >= 0 ? v : DEFAULTS[kind];
+  return Number.isFinite(v) && v >= 0 ? Math.min(v, 86_400) : DEFAULTS[kind];
+}
+
+function cached<T>(key: string, ttlMs: number, load: () => Promise<T>): Promise<T> {
+  const hit = cacheGet<T>(key);
+  if (hit !== null) return Promise.resolve(hit);
+
+  const pending = inFlight.get(key);
+  if (pending) return pending as Promise<T>;
+
+  const request = load()
+    .then((value) => {
+      cacheSet(key, value, ttlMs);
+      return value;
+    })
+    .finally(() => {
+      inFlight.delete(key);
+    });
+  inFlight.set(key, request);
+  return request;
 }
 
 function parseBases(env: string | undefined, fallback: string): string[] {
@@ -52,11 +72,13 @@ function getFallbackBases(): string[] {
 }
 
 function getTimeoutMs(): number {
-  return Number(process.env.CHALAOSHI_TIMEOUT_MS ?? 8000);
+  const value = Number(process.env.CHALAOSHI_TIMEOUT_MS ?? 8000);
+  return Number.isFinite(value) && value > 0 ? Math.min(Math.floor(value), 120_000) : 8000;
 }
 
 function getCooldownMs(): number {
-  return Number(process.env.FAILOVER_COOLDOWN_MS ?? 60_000);
+  const value = Number(process.env.FAILOVER_COOLDOWN_MS ?? 60_000);
+  return Number.isFinite(value) && value >= 0 ? Math.min(Math.floor(value), 3_600_000) : 60_000;
 }
 
 // ---- 域级故障熔断: 某域名失败(CF 拦截/超时/5xx/空响应)后, 冷却期内跳过它, 冷却结束自动恢复 ----
@@ -165,26 +187,24 @@ function cleanHtml(s: string): string {
 // ---------------------------------------------------------------- search
 export async function searchTeachers(q: string): Promise<TeacherHit[]> {
   const key = `search:${q}`;
-  const cached = cacheGet<TeacherHit[]>(key);
-  if (cached) return cached;
+  return cached(key, ttlSeconds('SEARCH') * 1000, async () => {
+    const path = '/search?' + new URLSearchParams({ q }).toString();
+    const body = await fetchWithFailover(getWebBases(), path);
 
-  const path = '/search?' + new URLSearchParams({ q }).toString();
-  const body = await fetchWithFailover(getWebBases(), path);
-
-  const re =
-    /class="item"[^>]*window\.location='\/t\/(\d+)\/'[\s\S]*?<h3>([^<]+)<\/h3>[\s\S]*?<p>([^<]*)<\/p>[\s\S]*?<h2>([^<]+)<\/h2>/g;
-  const hits: TeacherHit[] = [];
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(body))) {
-    hits.push({
-      tid: m[1],
-      name: cleanHtml(m[2]),
-      college: cleanHtml(m[3]),
-      score: cleanHtml(m[4]),
-    });
-  }
-  cacheSet(key, hits, ttlSeconds('SEARCH') * 1000);
-  return hits;
+    const re =
+      /class="item"[^>]*window\.location='\/t\/(\d+)\/'[\s\S]*?<h3>([^<]+)<\/h3>[\s\S]*?<p>([^<]*)<\/p>[\s\S]*?<h2>([^<]+)<\/h2>/g;
+    const hits: TeacherHit[] = [];
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(body))) {
+      hits.push({
+        tid: m[1],
+        name: cleanHtml(m[2]),
+        college: cleanHtml(m[3]),
+        score: cleanHtml(m[4]),
+      });
+    }
+    return hits;
+  });
 }
 
 // ---------------------------------------------------------------- teacher detail
@@ -196,89 +216,82 @@ function parseGpaCount(raw: string): { gpa: string; count: string } {
 
 export async function teacherDetail(tid: string): Promise<TeacherDetail> {
   const key = `teacher:${tid}`;
-  const cached = cacheGet<TeacherDetail>(key);
-  if (cached) return cached;
+  return cached(key, ttlSeconds('TEACHER') * 1000, async () => {
+    const body = await fetchWithFailover(getWebBases(), `/t/${tid}/`);
 
-  const body = await fetchWithFailover(getWebBases(), `/t/${tid}/`);
+    const nameM = body.match(/class="teacher">[\s\S]*?<h3>([^<]+)<\/h3>/);
+    const name = cleanHtml(nameM?.[1] ?? '');
+    if (!name) throw new UpstreamError('未找到该老师(可能不存在或已被删除)', 404);
 
-  const nameM = body.match(/class="teacher">[\s\S]*?<h3>([^<]+)<\/h3>/);
-  const name = cleanHtml(nameM?.[1] ?? '');
-  if (!name) throw new UpstreamError('未找到该老师(可能不存在或已被删除)', 404);
+    const collegeM = body.match(/<p id="cmcinfo">[^<]*<\/p>\s*<p>([^<]+)<\/p>/);
+    const rateM = body.match(/<div class="right">\s*<h2>([0-9.]+|N\/A)<\/h2>\s*<p>(\d+)人参与评分/);
+    const attM = body.match(/([\d.]+)%的人认为该老师会点名/);
+    const commM = body.match(/(\d+)个评论/);
 
-  const collegeM = body.match(/<p id="cmcinfo">[^<]*<\/p>\s*<p>([^<]+)<\/p>/);
-  const rateM = body.match(/<div class="right">\s*<h2>([0-9.]+|N\/A)<\/h2>\s*<p>(\d+)人参与评分/);
-  const attM = body.match(/([\d.]+)%的人认为该老师会点名/);
-  const commM = body.match(/(\d+)个评论/);
+    const courses: CourseGpa[] = [];
+    const courseRe = /class="course_name">([^<]+)<\/p>\s*<\/div>\s*<div class="right">\s*<p>([^<]+)<\/p>/g;
+    let cm: RegExpExecArray | null;
+    while ((cm = courseRe.exec(body))) {
+      const { gpa, count } = parseGpaCount(cleanHtml(cm[2]));
+      courses.push({ name: cleanHtml(cm[1]), gpa, count });
+    }
 
-  const courses: CourseGpa[] = [];
-  const courseRe = /class="course_name">([^<]+)<\/p>\s*<\/div>\s*<div class="right">\s*<p>([^<]+)<\/p>/g;
-  let cm: RegExpExecArray | null;
-  while ((cm = courseRe.exec(body))) {
-    const { gpa, count } = parseGpaCount(cleanHtml(cm[2]));
-    courses.push({ name: cleanHtml(cm[1]), gpa, count });
-  }
-
-  const detail: TeacherDetail = {
-    tid,
-    name,
-    college: cleanHtml(collegeM?.[1] ?? ''),
-    score: rateM?.[1] ?? 'N/A',
-    ratingCount: rateM?.[2] ?? '0',
-    rollCallRate: attM ? attM[1] + '%' : '数据不足',
-    commentCount: commM?.[1] ?? '0',
-    courses,
-  };
-  cacheSet(key, detail, ttlSeconds('TEACHER') * 1000);
-  return detail;
+    return {
+      tid,
+      name,
+      college: cleanHtml(collegeM?.[1] ?? ''),
+      score: rateM?.[1] ?? 'N/A',
+      ratingCount: rateM?.[2] ?? '0',
+      rollCallRate: attM ? attM[1] + '%' : '数据不足',
+      commentCount: commM?.[1] ?? '0',
+      courses,
+    };
+  });
 }
 
 // ---------------------------------------------------------------- comments
 export async function fetchComments(tid: string, sort: CommentSort): Promise<Comment[]> {
   const key = `comments:${tid}:${sort}`;
-  const cached = cacheGet<Comment[]>(key);
-  if (cached) return cached;
+  return cached(key, ttlSeconds('COMMENTS') * 1000, async () => {
+    const body = await fetchWithFailover(getApiBases(), `/comments/${tid}?sort=${sort}`);
 
-  const body = await fetchWithFailover(getApiBases(), `/comments/${tid}?sort=${sort}`);
-
-  const comments: Comment[] = [];
-  // 前 10 条为排序头部, 其余用 <hr id="sep"> 分隔; 解析整段即可拿到全部评论(顺序与上游排序一致)
-  const re =
-    /id="comment-page">[\s\S]*?<p>([\s\S]*?)<\/p>\s*<\/div>\s*<div class="right">\s*<a class="up[^"]*" id="like_(\d+)"[^>]*>[^<]*<\/a>\s*<p class="\d+-count">([^<]*)<\/p>\s*<a class="down[^"]*" id="dislike_\d+"[^>]*>[^<]*<\/a>\s*<\/div>\s*<\/div>\s*<p class="comment-footer">发布于&nbsp;([\d.]+)/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(body))) {
-    const digits = (m[3].match(/\d+/g) ?? []).join('');
-    comments.push({
-      id: m[2],
-      content: cleanHtml(m[1]),
-      likes: digits ? Number(digits) : 0,
-      date: m[4],
-    });
-  }
-  cacheSet(key, comments, ttlSeconds('COMMENTS') * 1000);
-  return comments;
+    const comments: Comment[] = [];
+    // 前 10 条为排序头部, 其余用 <hr id="sep"> 分隔; 解析整段即可拿到全部评论(顺序与上游排序一致)
+    const re =
+      /id="comment-page">[\s\S]*?<p>([\s\S]*?)<\/p>\s*<\/div>\s*<div class="right">\s*<a class="up[^"]*" id="like_(\d+)"[^>]*>[^<]*<\/a>\s*<p class="\d+-count">([^<]*)<\/p>\s*<a class="down[^"]*" id="dislike_\d+"[^>]*>[^<]*<\/a>\s*<\/div>\s*<\/div>\s*<p class="comment-footer">发布于&nbsp;([\d.]+)/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(body))) {
+      const digits = (m[3].match(/\d+/g) ?? []).join('');
+      comments.push({
+        id: m[2],
+        content: cleanHtml(m[1]),
+        likes: digits ? Number(digits) : 0,
+        date: m[4],
+      });
+    }
+    return comments;
+  });
 }
 
 // ---------------------------------------------------------------- course gpa
 export async function courseGpa(course: string): Promise<GpaRow[]> {
   const key = `gpa:${course}`;
-  const cached = cacheGet<GpaRow[]>(key);
-  if (cached) return cached;
+  return cached(key, ttlSeconds('GPA') * 1000, async () => {
+    const body = await fetchWithFailover(getApiBases(), '/gpa?' + new URLSearchParams({ course }).toString());
 
-  const body = await fetchWithFailover(getApiBases(), '/gpa?' + new URLSearchParams({ course }).toString());
-
-  const rows: GpaRow[] = [];
-  const re =
-    /<tr[^>]*>\s*<td class="course_name">([^<]+)<\/td>\s*<td>([\s\S]*?)<\/td>\s*<td>([\s\S]*?)<\/td>/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(body))) {
-    rows.push({
-      teacher: cleanHtml(m[1]),
-      gpa: cleanHtml(m[2]),
-      count: cleanHtml(m[3]),
-    });
-  }
-  cacheSet(key, rows, ttlSeconds('GPA') * 1000);
-  return rows;
+    const rows: GpaRow[] = [];
+    const re =
+      /<tr[^>]*>\s*<td class="course_name">([^<]+)<\/td>\s*<td>([\s\S]*?)<\/td>\s*<td>([\s\S]*?)<\/td>/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(body))) {
+      rows.push({
+        teacher: cleanHtml(m[1]),
+        gpa: cleanHtml(m[2]),
+        count: cleanHtml(m[3]),
+      });
+    }
+    return rows;
+  });
 }
 
 export function upstreamConfig() {
