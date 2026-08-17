@@ -37,13 +37,11 @@ function Endpoint({
   desc,
   params,
   exampleUrl,
-  response,
 }: {
   path: string;
   desc: string;
   params?: [string, string, string][];
   exampleUrl?: string;
-  response?: string;
 }) {
   return (
     <article className="doc-endpoint">
@@ -61,14 +59,6 @@ function Endpoint({
         <>
           <h4>请求参数</h4>
           <ParamTable rows={params} />
-        </>
-      )}
-      {response && (
-        <>
-          <h4>响应示例</h4>
-          <pre className="doc-code">
-            <code>{response}</code>
-          </pre>
         </>
       )}
     </article>
@@ -93,18 +83,6 @@ export default function ApiDocsPage() {
           desc="按姓名或拼音搜索老师, 返回候选列表(支持模糊匹配)。"
           params={[['q', 'string(必填)', '老师姓名或拼音, 如 陈建海 / chenjianhai']]}
           exampleUrl="/api/search?q=陈建海"
-          response={`{
-  "q": "陈建海",
-  "count": 1,
-  "teachers": [
-    {
-      "tid": "1902",
-      "name": "陈建海",
-      "college": "计算机科学与技术学院",
-      "score": "9.8"
-    }
-  ]
-}`}
         />
 
         <Endpoint
@@ -112,19 +90,6 @@ export default function ApiDocsPage() {
           desc="老师详情: 综合评分、参与打分人数、点名率、评论数, 以及各门课的历史平均绩点。"
           params={[['tid', 'string(必填)', '老师数字 ID, 来自搜索结果的 tid']]}
           exampleUrl="/api/teacher/1902"
-          response={`{
-  "tid": "1902",
-  "name": "陈建海",
-  "college": "计算机科学与技术学院",
-  "score": "9.84",
-  "ratingCount": "473",
-  "rollCallRate": "19.9%",
-  "commentCount": "395",
-  "courses": [
-    { "name": "C程序设计基础及实验", "gpa": "4.16", "count": "204" },
-    { "name": "区块链技术应用实践", "gpa": "4.29", "count": "157" }
-  ]
-}`}
         />
 
         <Endpoint
@@ -137,22 +102,6 @@ export default function ApiDocsPage() {
             ['offset', 'number', '偏移量, 默认 0'],
           ]}
           exampleUrl="/api/comments/1902?sort=time&limit=20"
-          response={`{
-  "tid": "1902",
-  "sort": "rate",
-  "total": 395,
-  "offset": 0,
-  "limit": 20,
-  "hasMore": true,
-  "comments": [
-    {
-      "id": "17295",
-      "content": "陈老师的人格魅力……",
-      "likes": 188,
-      "date": "2017.12.19"
-    }
-  ]
-}`}
         />
 
         <Endpoint
@@ -160,62 +109,13 @@ export default function ApiDocsPage() {
           desc="列出该课所有任课老师的平均绩点(±标准差)与上报人数, 按绩点排序。数据来自「课否」。"
           params={[['course', 'string(必填)', '课程名, 支持模糊匹配']]}
           exampleUrl="/api/gpa?course=程序设计基础及实验"
-          response={`{
-  "course": "程序设计基础及实验",
-  "count": 11,
-  "rows": [
-    { "teacher": "陈建海", "gpa": "4.16±0.5", "count": "204" }
-  ]
-}`}
         />
 
         <Endpoint
           path="/api/health[?probe=1]"
           desc="代理存活检查。加 probe=1 时真实探测上游 chalaoshi.de 是否可访问。"
           exampleUrl="/api/health"
-          response={`{
-  "ok": true,
-  "time": "2026-08-16T10:53:26Z",
-  "cacheEntries": 1,
-  "upstream": { "web": ["https://chalaoshi.de"], "api": ["https://api.chalaoshi.de"] }
-}`}
         />
-      </section>
-
-      <section className="docs-section">
-        <h2>错误与状态码</h2>
-        <ul className="docs-list">
-          <li>
-            <strong>400</strong> 请求参数无效，响应的 <code className="inline-code">code</code> 说明具体原因。
-          </li>
-          <li>
-            <strong>404</strong> 老师不存在或已被删除，<code className="inline-code">code</code> 为{' '}
-            <code className="inline-code">teacher_not_found</code>。
-          </li>
-          <li>
-            <strong>429</strong> 触发限流, 响应含 <code className="inline-code">retryAfter</code> 秒。
-          </li>
-          <li>
-            <strong>502</strong> 上游 chalaoshi.de 暂时无法访问。响应的{' '}
-            <code className="inline-code">upstreamAttempts</code> 列出每个域名的 HTTP 状态、超时或网络错误。
-          </li>
-          <li>
-            错误体统一为:{' '}
-            <pre className="doc-code doc-code-inline">
-              <code>{`{
-  "error": "上游请求超时（8000ms）",
-  "code": "upstream_timeout",
-  "upstreamAttempts": [
-    {
-      "base": "https://chalaoshi.de",
-      "code": "upstream_timeout",
-      "message": "上游请求超时（8000ms）"
-    }
-  ]
-}`}</code>
-            </pre>
-          </li>
-        </ul>
       </section>
     </article>
   );

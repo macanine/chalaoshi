@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import CommentSection from './CommentSection';
 import { scoreClass } from './ScoreBadge';
 import type { TeacherDetail as TeacherDetailData } from '@/lib/types';
@@ -13,6 +14,25 @@ type State =
   | { status: 'error'; message: string; is404: boolean };
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
+
+function BackBar() {
+  const router = useRouter();
+
+  function goBack() {
+    if (window.history.length > 1) {
+      window.history.back();
+      return;
+    }
+    router.push('/');
+  }
+
+  return (
+    <button className="back-bar" type="button" onClick={goBack} aria-label="返回上一页">
+      <span className="back-bar-icon" aria-hidden="true">←</span>
+      <span>返回上一页</span>
+    </button>
+  );
+}
 
 export default function TeacherDetail({ tid }: { tid: string }) {
   const [state, setState] = useState<State>({ status: 'loading' });
@@ -56,53 +76,59 @@ export default function TeacherDetail({ tid }: { tid: string }) {
 
   if (state.status === 'loading') {
     return (
-      <div aria-busy="true" aria-label="加载老师详情">
-        <section className="panel" aria-hidden="true">
-          <div className="teacher-header-top">
-            <div style={{ flex: 1 }}>
-              {/* 姓名条按真实中文名宽度(2-4字)定宽, 不要用百分比——在宽容器里会撑得巨大 */}
-              <div className="skeleton" style={{ width: 100, height: 32 }} />
-              <div className="skeleton" style={{ width: 190, height: 18, marginTop: 10 }} />
-            </div>
-            <div className="skeleton" style={{ width: 72, height: 56, borderRadius: 12 }} />
-          </div>
-          <div className="stats">
-            {[0, 1, 2].map((i) => (
-              <div className="stat" key={i}>
-                <div className="skeleton" style={{ width: 48, height: 22 }} />
-                <div className="skeleton" style={{ width: 60, height: 14, marginTop: 6 }} />
+      <>
+        <BackBar />
+        <div aria-busy="true" aria-label="加载老师详情">
+          <section className="panel" aria-hidden="true">
+            <div className="teacher-header-top">
+              <div style={{ flex: 1 }}>
+                {/* 姓名条按真实中文名宽度(2-4字)定宽, 不要用百分比——在宽容器里会撑得巨大 */}
+                <div className="skeleton" style={{ width: 100, height: 32 }} />
+                <div className="skeleton" style={{ width: 190, height: 18, marginTop: 10 }} />
               </div>
-            ))}
-          </div>
-        </section>
-        <section className="panel" aria-hidden="true">
-          <div className="skeleton" style={{ width: 120, height: 20 }} />
-          <div className="course-grid" style={{ marginTop: 14 }}>
-            {[0, 1, 2, 3].map((i) => (
-              <div className="skeleton" key={i} style={{ height: 90, borderRadius: 10 }} />
-            ))}
-          </div>
-        </section>
-      </div>
+              <div className="skeleton" style={{ width: 72, height: 56, borderRadius: 12 }} />
+            </div>
+            <div className="stats">
+              {[0, 1, 2].map((i) => (
+                <div className="stat" key={i}>
+                  <div className="skeleton" style={{ width: 48, height: 22 }} />
+                  <div className="skeleton" style={{ width: 60, height: 14, marginTop: 6 }} />
+                </div>
+              ))}
+            </div>
+          </section>
+          <section className="panel" aria-hidden="true">
+            <div className="skeleton" style={{ width: 120, height: 20 }} />
+            <div className="course-grid" style={{ marginTop: 14 }}>
+              {[0, 1, 2, 3].map((i) => (
+                <div className="skeleton" key={i} style={{ height: 90, borderRadius: 10 }} />
+              ))}
+            </div>
+          </section>
+        </div>
+      </>
     );
   }
 
   if (state.status === 'error') {
     return (
-      <section className="empty panel">
-        <h1>{state.is404 ? '没有找到这位老师' : '出错了'}</h1>
-        <p>
-          {state.is404
-            ? '该老师可能不存在或已被删除。'
-            : '可能是上游 chalaoshi.de 暂时无法访问(需要科学上网或域名已更换)。'}
-        </p>
-        <p style={{ color: 'var(--muted)', fontSize: 13 }}>{state.message}</p>
-        <p>
-          <Link className="btn" href="/">
-            返回搜索
-          </Link>
-        </p>
-      </section>
+      <>
+        <BackBar />
+        <section className="empty panel">
+          <h1>{state.is404 ? '没有找到这位老师' : '出错了'}</h1>
+          <p>
+            {state.is404
+              ? '该老师可能不存在或已被删除。'
+              : '可能是上游 chalaoshi.de 暂时无法访问(需要科学上网或域名已更换)。'}
+          </p>
+          <p style={{ color: 'var(--muted)', fontSize: 13 }}>{state.message}</p>
+          <p>
+            <Link className="btn" href="/">
+              返回搜索
+            </Link>
+          </p>
+        </section>
+      </>
     );
   }
 
@@ -110,9 +136,7 @@ export default function TeacherDetail({ tid }: { tid: string }) {
 
   return (
     <>
-      <Link className="back-link" href="/">
-        ← 返回搜索
-      </Link>
+      <BackBar />
 
       <section className="panel">
         <div className="teacher-header-top">

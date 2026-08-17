@@ -375,15 +375,39 @@ textarea {
 .score-na   { background: var(--muted); }
 
 /* ------------------------------------------------ teacher page */
-.back-link {
-  display: inline-block;
-  margin: 6px 2px 2px;
+.back-bar {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 44px;
+  margin: 0 0 8px;
+  padding: 0 12px;
+  gap: 8px;
+  color: var(--text);
+  font: inherit;
   font-size: 14px;
-  color: var(--muted);
+  font-weight: 600;
+  text-align: left;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
 }
 
-.back-link:hover {
+.back-bar:hover {
   color: var(--accent);
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.back-bar:active {
+  transform: scale(0.99);
+}
+
+.back-bar-icon {
+  font-size: 20px;
+  line-height: 1;
 }
 
 .teacher-header-top {
