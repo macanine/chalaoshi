@@ -6,12 +6,35 @@
 import { cacheGet, cacheSet } from './cache';
 import type { Comment, CommentSort, CourseGpa, GpaRow, TeacherDetail, TeacherHit } from './types';
 
+export interface UpstreamAttempt {
+  base: string;
+  code: string;
+  message: string;
+  upstreamStatus?: number;
+}
+
 export class UpstreamError extends Error {
-  status: number;
-  constructor(message: string, status = 502) {
+  code: string;
+  upstreamStatus?: number;
+  attempts: UpstreamAttempt[];
+
+  constructor(
+    message: string,
+    {
+      code = 'upstream_unavailable',
+      upstreamStatus,
+      attempts = [],
+    }: {
+      code?: string;
+      upstreamStatus?: number;
+      attempts?: UpstreamAttempt[];
+    } = {}
+  ) {
     super(message);
     this.name = 'UpstreamError';
-    this.status = status;
+    this.code = code;
+    this.upstreamStatus = upstreamStatus;
+    this.attempts = attempts;
   }
 }
 
@@ -110,11 +133,15 @@ function isDomainLevelStatus(status: number): boolean {
 async function tryBases(
   bases: string[],
   pathAndQuery: string
-): Promise<{ ok: true; text: string } | { ok: false; error: unknown }> {
+): Promise<{ ok: true; text: string } | { ok: false; error: UpstreamError }> {
   const probeAll = bases.length > 0 && bases.every((b) => isBaseDisabled(b));
-  let lastError: unknown;
+  const attempts: UpstreamAttempt[] = [];
+  let lastError: UpstreamError | null = null;
   for (const base of bases) {
-    if (isBaseDisabled(base) && !probeAll) continue;
+    if (isBaseDisabled(base) && !probeAll) {
+      attempts.push({ base, code: 'upstream_circuit_open', message: '该上游正在冷却，已跳过本次请求' });
+      continue;
+    }
     try {
       const res = await fetch(base + pathAndQuery, {
         headers: {
@@ -126,15 +153,36 @@ async function tryBases(
         cache: 'no-store',
       });
       if (!res.ok) {
-        const err = new UpstreamError(`上游返回 HTTP ${res.status} (${res.statusText})`, res.status);
+        const attempt: UpstreamAttempt = {
+          base,
+          code: `upstream_http_${res.status}`,
+          message: `上游返回 HTTP ${res.status}${res.statusText ? ` (${res.statusText})` : ''}`,
+          upstreamStatus: res.status,
+        };
+        const err = new UpstreamError(attempt.message, {
+          code: attempt.code,
+          upstreamStatus: res.status,
+          attempts: [...attempts, attempt],
+        });
         if (isDomainLevelStatus(res.status)) disableBase(base);
+        if (res.status === 404) return { ok: false, error: err };
+        attempts.push(attempt);
         lastError = err;
         continue;
       }
       const text = await res.text();
       if (!text) {
         disableBase(base);
-        lastError = new UpstreamError('上游返回空内容', 502);
+        const attempt: UpstreamAttempt = {
+          base,
+          code: 'upstream_empty_response',
+          message: '上游返回空内容',
+        };
+        attempts.push(attempt);
+        lastError = new UpstreamError(attempt.message, {
+          code: attempt.code,
+          attempts: [...attempts],
+        });
         continue;
       }
       disabledUntil.delete(base); // 恢复成功, 立即解除该域熔断
@@ -143,10 +191,30 @@ async function tryBases(
     } catch (e) {
       // 网络错误 / 超时(AbortSignal.timeout): 域名不可达, 熔断
       disableBase(base);
-      lastError = e;
+      const isTimeout = e instanceof Error && (e.name === 'TimeoutError' || e.name === 'AbortError');
+      const attempt: UpstreamAttempt = {
+        base,
+        code: isTimeout ? 'upstream_timeout' : 'upstream_network_error',
+        message: isTimeout
+          ? `上游请求超时（${getTimeoutMs()}ms）`
+          : `无法连接上游：${e instanceof Error ? e.message : String(e)}`,
+      };
+      attempts.push(attempt);
+      lastError = new UpstreamError(attempt.message, {
+        code: attempt.code,
+        attempts: [...attempts],
+      });
     }
   }
-  return { ok: false, error: lastError };
+  return {
+    ok: false,
+    error:
+      lastError ??
+      new UpstreamError('未配置可用的上游域名', {
+        code: 'upstream_not_configured',
+        attempts,
+      }),
+  };
 }
 
 /** 先按优先级试主域名列表, 全部失败再 fallback 到同类镜像站(CHALAOSHI_FALLBACK), 仍失败才抛错 */
@@ -155,17 +223,23 @@ async function fetchWithFailover(bases: string[], pathAndQuery: string): Promise
   if (primary.ok) return primary.text;
 
   // 404 是资源层面"不存在"的确定答案, 同类镜像站也会 404, 不必再兜底
-  if (primary.error instanceof UpstreamError && primary.error.status === 404) throw primary.error;
+  if (primary.error.upstreamStatus === 404) throw primary.error;
 
   const fallback = getFallbackBases();
   if (fallback.length > 0) {
     const fb = await tryBases(fallback, pathAndQuery);
     if (fb.ok) return fb.text;
+    throw new UpstreamError('主上游与兜底上游均不可用', {
+      code: 'upstream_unavailable',
+      attempts: [...primary.error.attempts, ...fb.error.attempts],
+    });
   }
 
-  // 报主域名的错误(它才是配置的根因), 兜底失败只是连带
-  if (primary.error instanceof UpstreamError) throw primary.error;
-  throw new UpstreamError(`无法连接上游 ${bases.join(', ')} (需要科学上网或域名已更换)`, 502);
+  throw new UpstreamError(primary.error.message, {
+    code: primary.error.code,
+    upstreamStatus: primary.error.upstreamStatus,
+    attempts: primary.error.attempts,
+  });
 }
 
 /** 去掉标签与 HTML 实体, 压缩空白 */
@@ -221,7 +295,11 @@ export async function teacherDetail(tid: string): Promise<TeacherDetail> {
 
     const nameM = body.match(/class="teacher">[\s\S]*?<h3>([^<]+)<\/h3>/);
     const name = cleanHtml(nameM?.[1] ?? '');
-    if (!name) throw new UpstreamError('未找到该老师(可能不存在或已被删除)', 404);
+    if (!name) {
+      throw new UpstreamError('未找到该老师(可能不存在或已被删除)', {
+        code: 'teacher_not_found',
+      });
+    }
 
     const collegeM = body.match(/<p id="cmcinfo">[^<]*<\/p>\s*<p>([^<]+)<\/p>/);
     const rateM = body.match(/<div class="right">\s*<h2>([0-9.]+|N\/A)<\/h2>\s*<p>(\d+)人参与评分/);

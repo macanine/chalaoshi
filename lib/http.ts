@@ -39,17 +39,30 @@ export function enforceRateLimit(req: Request): { ok: true } | { ok: false; res:
   return {
     ok: false,
     res: json(
-      { error: 'rate_limited', retryAfter: r.retryAfter },
+      { error: `请求过于频繁，请在 ${r.retryAfter} 秒后重试`, code: 'rate_limited', retryAfter: r.retryAfter },
       { status: 429, headers: { 'Retry-After': String(r.retryAfter) } }
     ),
   };
 }
 
+export function errorBody(e: unknown): Record<string, unknown> {
+  if (e instanceof UpstreamError) {
+    return {
+      error: e.message,
+      code: e.code,
+      ...(e.upstreamStatus !== undefined ? { upstreamStatus: e.upstreamStatus } : {}),
+      ...(e.attempts.length > 0 ? { upstreamAttempts: e.attempts } : {}),
+    };
+  }
+
+  const detail = e instanceof Error ? e.message : String(e);
+  return { error: '服务器内部错误', code: 'internal_error', detail };
+}
+
 export function handleError(e: unknown): NextResponse {
   if (e instanceof UpstreamError) {
-    const status = e.status >= 500 ? 502 : e.status >= 400 ? e.status : 502;
-    return json({ error: e.message, upstreamStatus: e.status }, { status });
+    const status = e.code === 'teacher_not_found' || e.upstreamStatus === 404 ? 404 : 502;
+    return json(errorBody(e), { status });
   }
-  const msg = e instanceof Error ? e.message : String(e);
-  return json({ error: 'internal_error', detail: msg }, { status: 500 });
+  return json(errorBody(e), { status: 500 });
 }

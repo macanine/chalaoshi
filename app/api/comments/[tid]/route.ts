@@ -18,7 +18,7 @@ export async function GET(
 
   const { tid } = await ctx.params;
   if (!/^\d+$/.test(tid)) {
-    return json({ error: 'tid 必须是数字' }, { status: 400 });
+    return json({ error: 'tid 必须是数字', code: 'invalid_tid' }, { status: 400 });
   }
 
   const sp = req.nextUrl.searchParams;

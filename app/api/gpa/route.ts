@@ -10,8 +10,8 @@ export async function GET(req: NextRequest) {
   if (!rl.ok) return rl.res;
 
   const course = req.nextUrl.searchParams.get('course')?.trim();
-  if (!course) return json({ error: '参数缺失: 需要 course (课程名)' }, { status: 400 });
-  if (course.length > 100) return json({ error: 'course 最长为 100 个字符' }, { status: 400 });
+  if (!course) return json({ error: '参数缺失: 需要 course (课程名)', code: 'missing_course' }, { status: 400 });
+  if (course.length > 100) return json({ error: 'course 最长为 100 个字符', code: 'course_too_long' }, { status: 400 });
 
   try {
     const rows = await courseGpa(course);

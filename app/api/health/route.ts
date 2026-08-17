@@ -1,6 +1,6 @@
 import { cacheSize } from '@/lib/cache';
 import { searchTeachers, upstreamConfig } from '@/lib/chalaoshi';
-import { enforceRateLimit, json } from '@/lib/http';
+import { enforceRateLimit, errorBody, json } from '@/lib/http';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60; // Vercel: 上游探测可能超过默认 10s, 放宽到 60s
@@ -27,7 +27,7 @@ export async function GET(req: Request) {
       const hits = await searchTeachers('陈建海');
       body.upstreamProbe = { ok: true, hits: hits.length, servedBy: upstreamConfig().lastServedBase };
     } catch (e) {
-      body.upstreamProbe = { ok: false, error: e instanceof Error ? e.message : String(e) };
+      body.upstreamProbe = { ok: false, ...errorBody(e) };
       body.ok = false;
     }
   }

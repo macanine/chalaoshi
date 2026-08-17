@@ -58,7 +58,7 @@ lib/
 2. 所有 Route Handler 都必须 `export const dynamic = 'force-dynamic'`，并在执行逻辑前调用 `enforceRateLimit(req)`。
 3. 通过 `json()` 返回响应，保证 CORS 一致；可抛出的上游调用放入 `try/catch` 并经 `handleError()` 映射。
 4. 动态参数先验证再请求上游。老师 `tid` 必须为数字；搜索词和课程名必须保持长度上限。
-5. 新端点必须同步更新 `lib/types.ts`、`lib/apiEndpoints.ts`、`/docs`，并遵循现有错误体：`{ error, upstreamStatus? }`。429 必须保留 `Retry-After`。
+5. 新端点必须同步更新 `lib/types.ts`、`lib/apiEndpoints.ts`、`/docs`，错误体必须有稳定的 `code`；上游错误保留 `upstreamStatus?` 与 `upstreamAttempts?`。429 必须保留 `Retry-After`。
 6. `/api/health?probe=1` 会访问上游，只可作为受限探测，不要将其改成未受保护的重请求接口。
 
 ### Cloudflare 与配置

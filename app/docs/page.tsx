@@ -186,18 +186,33 @@ export default function ApiDocsPage() {
         <h2>错误与状态码</h2>
         <ul className="docs-list">
           <li>
-            <strong>404</strong> 老师不存在或已被删除。
+            <strong>400</strong> 请求参数无效，响应的 <code className="inline-code">code</code> 说明具体原因。
+          </li>
+          <li>
+            <strong>404</strong> 老师不存在或已被删除，<code className="inline-code">code</code> 为{' '}
+            <code className="inline-code">teacher_not_found</code>。
           </li>
           <li>
             <strong>429</strong> 触发限流, 响应含 <code className="inline-code">retryAfter</code> 秒。
           </li>
           <li>
-            <strong>502</strong> 上游 chalaoshi.de 暂时无法访问(通常需要科学上网或域名已更换)。
+            <strong>502</strong> 上游 chalaoshi.de 暂时无法访问。响应的{' '}
+            <code className="inline-code">upstreamAttempts</code> 列出每个域名的 HTTP 状态、超时或网络错误。
           </li>
           <li>
             错误体统一为:{' '}
             <pre className="doc-code doc-code-inline">
-              <code>{`{ "error": "说明", "upstreamStatus": 502 }`}</code>
+              <code>{`{
+  "error": "上游请求超时（8000ms）",
+  "code": "upstream_timeout",
+  "upstreamAttempts": [
+    {
+      "base": "https://chalaoshi.de",
+      "code": "upstream_timeout",
+      "message": "上游请求超时（8000ms）"
+    }
+  ]
+}`}</code>
             </pre>
           </li>
         </ul>

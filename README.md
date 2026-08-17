@@ -49,7 +49,7 @@ pnpm dev   # http://localhost:3000
 curl 'http://localhost:3000/api/search?q=陈建海'
 ```
 
-错误响应形如 `{ "error": "...", "upstreamStatus"?: 502 }`：`400` 缺参数，`404` 老师不存在，`429` 限流（带 `retryAfter`），`502` 上游不可达。
+错误响应统一包含稳定的 `code`，例如 `{ "error": "参数缺失: 需要 q (老师姓名或拼音)", "code": "missing_query" }`。上游不可达时返回 502，并附 `upstreamStatus`（上游 HTTP 状态）和 `upstreamAttempts`（每个域名的具体失败原因）；`404` 为 `teacher_not_found`，`429` 为 `rate_limited`（带 `retryAfter`）。
 
 ## 前端页面
 
