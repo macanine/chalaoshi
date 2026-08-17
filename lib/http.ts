@@ -8,7 +8,10 @@ const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Accept',
+  'Access-Control-Max-Age': '86400',
 };
+
+const MAX_RATE_LIMIT_PER_MINUTE = 1_000;
 
 /** 统一 JSON 响应, 附上允许跨域的头(方便 AI 工具/前端直接调用) */
 export function json(data: unknown, init?: number | ResponseInit): NextResponse {
@@ -18,17 +21,22 @@ export function json(data: unknown, init?: number | ResponseInit): NextResponse 
   return resp;
 }
 
+/** 浏览器跨域预检。预检不访问上游，也不占用实际 API 请求配额。 */
+export function corsPreflight(): NextResponse {
+  return new NextResponse(null, { status: 204, headers: CORS });
+}
+
 function clientKey(req: Request): string {
-  return (
+  const forwarded =
     req.headers.get('cf-connecting-ip') ||
     req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    'local'
-  );
+    'local';
+  return forwarded.slice(0, 64) || 'local';
 }
 
 function rateLimitPerMinute(): number {
   const value = Number(process.env.RATE_LIMIT_PER_MIN ?? 60);
-  return Number.isFinite(value) && value >= 0 ? Math.floor(value) : 60;
+  return Number.isInteger(value) && value >= 0 && value <= MAX_RATE_LIMIT_PER_MINUTE ? value : 60;
 }
 
 export function enforceRateLimit(req: Request): { ok: true } | { ok: false; res: NextResponse } {
@@ -55,8 +63,7 @@ export function errorBody(e: unknown): Record<string, unknown> {
     };
   }
 
-  const detail = e instanceof Error ? e.message : String(e);
-  return { error: '服务器内部错误', code: 'internal_error', detail };
+  return { error: '服务器内部错误', code: 'internal_error' };
 }
 
 export function handleError(e: unknown): NextResponse {
@@ -64,5 +71,6 @@ export function handleError(e: unknown): NextResponse {
     const status = e.code === 'teacher_not_found' || e.upstreamStatus === 404 ? 404 : 502;
     return json(errorBody(e), { status });
   }
+  console.error('Unhandled API error', e);
   return json(errorBody(e), { status: 500 });
 }

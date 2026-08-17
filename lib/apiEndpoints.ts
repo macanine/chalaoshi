@@ -32,5 +32,19 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
     returns: '该课全体任课老师的平均绩点±标准差与人数',
     example: '/api/gpa?course=程序设计基础及实验',
   },
+  {
+    method: 'GET',
+    path: '/api/recent',
+    returns: '全站最近成功访问的老师与最近有结果的课程',
+    example: '/api/recent',
+  },
   { method: 'GET', path: '/api/health', returns: '代理存活与上游配置', example: '/api/health' },
 ];
+
+export const SKILL_CATALOG = {
+  name: 'course-schedule-planner',
+  description: '根据平均绩点、近期给分讨论和高赞评价比较老师，并生成无冲突课表方案。',
+  path: '/skills/course-schedule-planner/SKILL.md',
+  catalog: '/skills/index.json',
+  version: '1.0',
+} as const;

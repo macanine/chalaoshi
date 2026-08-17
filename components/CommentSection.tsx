@@ -11,6 +11,24 @@ interface PageState {
   offset: number;
 }
 
+function isComment(value: unknown): value is Comment {
+  if (!value || typeof value !== 'object') return false;
+  const comment = value as Partial<Comment>;
+  return (
+    typeof comment.id === 'string' &&
+    typeof comment.content === 'string' &&
+    typeof comment.likes === 'number' &&
+    Number.isFinite(comment.likes) &&
+    typeof comment.date === 'string'
+  );
+}
+
+function apiError(data: unknown, fallback: string): string {
+  return data !== null && typeof data === 'object' && typeof (data as { error?: unknown }).error === 'string'
+    ? (data as { error: string }).error
+    : fallback;
+}
+
 /**
  * 评论列表。
  * 平滑切换优化:
@@ -39,6 +57,7 @@ export default function CommentSection({
   const seqRef = useRef(0);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const requestsRef = useRef(new Map<string, Promise<PageState>>());
+  const controllersRef = useRef(new Map<string, AbortController>());
 
   const loadPage = useCallback(
     (s: CommentSort, off: number): Promise<PageState> => {
@@ -46,15 +65,32 @@ export default function CommentSection({
       const pending = requestsRef.current.get(key);
       if (pending) return pending;
 
+      const controller = new AbortController();
+      controllersRef.current.set(key, controller);
       const request = (async () => {
-        const res = await fetch(`/api/comments/${tid}?sort=${s}&limit=${PAGE}&offset=${off}`);
+        const res = await fetch(`/api/comments/${tid}?sort=${s}&limit=${PAGE}&offset=${off}`, {
+          signal: controller.signal,
+        });
         const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || '加载失败');
-        const comments: Comment[] = data.comments ?? [];
-        return { comments, total: data.total ?? 0, offset: off + comments.length };
+        if (!res.ok) throw new Error(apiError(data, '加载失败'));
+        if (
+          !Array.isArray(data.comments) ||
+          !data.comments.every(isComment) ||
+          !Number.isSafeInteger(data.total) ||
+          data.total < 0
+        ) {
+          throw new Error('服务返回了无效的评论数据');
+        }
+        const comments: Comment[] = data.comments;
+        return { comments, total: data.total, offset: off + comments.length };
       })();
       requestsRef.current.set(key, request);
-      void request.finally(() => requestsRef.current.delete(key)).catch(() => {});
+      void request
+        .finally(() => {
+          requestsRef.current.delete(key);
+          controllersRef.current.delete(key);
+        })
+        .catch(() => {});
       return request;
     },
     [tid]
@@ -143,6 +179,12 @@ export default function CommentSection({
 
   useEffect(() => {
     void loadSort(defaultSort);
+    return () => {
+      seqRef.current += 1;
+      for (const controller of controllersRef.current.values()) controller.abort();
+      controllersRef.current.clear();
+      requestsRef.current.clear();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -175,6 +217,7 @@ export default function CommentSection({
 
       <div className="tabs" role="tablist" aria-label="评论排序">
         <button
+          type="button"
           className={`tab ${sort === 'time' ? 'active' : ''}`}
           onClick={() => onSwitch('time')}
           aria-pressed={sort === 'time'}
@@ -182,6 +225,7 @@ export default function CommentSection({
           最新
         </button>
         <button
+          type="button"
           className={`tab ${sort === 'rate' ? 'active' : ''}`}
           onClick={() => onSwitch('rate')}
           aria-pressed={sort === 'rate'}
@@ -226,7 +270,7 @@ export default function CommentSection({
           (loading ? (
             <span className="spinner" role="status" aria-label="加载中" />
           ) : (
-            <button className="btn ghost" onClick={() => void loadMore()} disabled={loading}>
+            <button type="button" className="btn ghost" onClick={() => void loadMore()} disabled={loading}>
               加载更多 ({comments.length}/{total})
             </button>
           ))}

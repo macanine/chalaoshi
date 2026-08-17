@@ -20,43 +20,109 @@
   margin: 0;
 }
 
-/* 基础 URL + 复制给 AI */
-.docs-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
+/* Skill installation guide */
+.skill-guide {
   margin-top: 16px;
-  padding: 14px 16px;
+  padding: 20px;
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
 }
 
-.base-url {
+.skill-guide-head {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 13px;
-  color: var(--muted);
-  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
 }
 
-.base-url code {
-  font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 13.5px;
-  font-weight: 600;
-  color: var(--text);
-  word-break: break-all;
+.skill-guide h2 {
+  margin: 0 0 4px;
+  font-size: 21px;
+  line-height: 1.3;
 }
 
-.docs-copy-btn {
+.skill-kicker {
+  margin: 0 0 4px;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+}
+
+.docs-skill-btn {
   flex-shrink: 0;
-  min-height: 40px;
+  min-width: 136px;
   padding: 0 16px;
   font-size: 13px;
+  white-space: nowrap;
+}
+
+.skill-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: skill-step;
+}
+
+.skill-steps li {
+  position: relative;
+  min-height: 106px;
+  padding: 34px 12px 12px;
+  background: var(--bg-soft);
+  border-radius: 8px;
+  counter-increment: skill-step;
+}
+
+.skill-steps li::before {
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  width: 20px;
+  height: 20px;
+  content: counter(skill-step);
+  color: var(--accent-ink);
+  background: var(--accent);
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 20px;
+  text-align: center;
+}
+
+.skill-steps strong,
+.skill-steps span {
+  display: block;
+}
+
+.skill-steps strong {
+  margin-bottom: 4px;
+  font-size: 14px;
+}
+
+.skill-steps span,
+.skill-use p {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.skill-use {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.skill-use h3 {
+  margin: 0 0 6px;
+  font-size: 15px;
+}
+
+.skill-use p {
+  margin: 4px 0 0;
 }
 
 .docs-section {
@@ -91,6 +157,7 @@
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+  min-width: 0;
 }
 
 .doc-method {
@@ -105,14 +172,18 @@
 }
 
 .doc-path {
+  min-width: 0;
   font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 14px;
   font-weight: 600;
   color: var(--text);
   word-break: break-all;
+  overflow-wrap: anywhere;
 }
 
 .doc-try {
+  display: inline-flex;
+  align-items: center;
   margin-left: auto;
   flex-shrink: 0;
   font-size: 13px;
@@ -122,6 +193,10 @@
 
 .doc-try:hover {
   text-decoration: underline;
+}
+
+.doc-try:focus-visible {
+  border-radius: 4px;
 }
 
 .doc-ep-desc {
@@ -150,6 +225,7 @@
   padding: 9px 10px;
   border-bottom: 1px solid var(--border);
   vertical-align: top;
+  overflow-wrap: anywhere;
 }
 
 .docs-params th {
@@ -218,9 +294,9 @@
   color: var(--text);
 }
 
-/* 入场动画: 与其他页面一致(rise), 端点卡片依次上浮 */
+/* 与站内搜索结果和评论一致的轻量入场动画 */
 .docs-head,
-.docs-top {
+.skill-guide {
   animation: rise 0.4s ease both;
 }
 
@@ -236,7 +312,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .docs-head,
-  .docs-top,
+  .skill-guide,
   .doc-endpoint {
     animation: none;
   }
@@ -251,17 +327,43 @@
     font-size: 22px;
   }
 
-  .docs-top {
+  .skill-guide-head {
     align-items: stretch;
     flex-direction: column;
   }
 
-  .docs-copy-btn {
+  .skill-guide {
+    padding: 18px 16px;
+  }
+
+  .skill-guide h2 {
+    font-size: 20px;
+  }
+
+  .docs-skill-btn {
     width: 100%;
+  }
+
+  .skill-steps {
+    grid-template-columns: 1fr;
+  }
+
+  .skill-steps li {
+    min-height: 0;
   }
 
   .doc-endpoint {
     padding: 16px;
+  }
+
+  .doc-ep-head {
+    align-items: flex-start;
+  }
+
+  .doc-try {
+    width: 100%;
+    margin-left: 0;
+    padding-top: 2px;
   }
 
   .docs-section {
@@ -271,5 +373,16 @@
   .docs-params th:nth-child(2),
   .docs-params td:nth-child(2) {
     display: none; /* 手机上隐藏"类型"列, 更紧凑 */
+  }
+}
+
+@media (max-width: 380px) {
+  .docs-head h1 {
+    font-size: 21px;
+  }
+
+  .docs-params th,
+  .docs-params td {
+    padding-inline: 7px;
   }
 }

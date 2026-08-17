@@ -277,6 +277,101 @@ textarea {
   cursor: not-allowed;
 }
 
+/* ------------------------------------------------ recent queries */
+.recent-queries {
+  margin-top: 18px;
+  overflow: hidden;
+}
+
+.recent-queries-viewport {
+  overflow: hidden;
+  padding-block: 10px;
+  border-block: 1px solid var(--border);
+}
+
+.recent-queries-track {
+  display: flex;
+  gap: 10px;
+  width: max-content;
+  will-change: transform;
+  animation: recent-queries-scroll 48s linear infinite;
+}
+
+.recent-queries:hover .recent-queries-track,
+.recent-queries:focus-within .recent-queries-track {
+  animation-play-state: paused;
+}
+
+@keyframes recent-queries-scroll {
+  to {
+    transform: translateX(calc(-50% - 5px));
+  }
+}
+
+.recent-queries-list {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 10px;
+  margin: 0;
+  list-style: none;
+}
+
+.recent-query {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 44px;
+  padding: 0 10px 0 13px;
+  gap: 8px;
+  color: var(--muted);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: none;
+  transition: border-color 0.15s, background 0.15s, color 0.15s, transform 0.15s;
+}
+
+.recent-query:hover {
+  color: var(--accent);
+  background: var(--card);
+  border-color: var(--accent);
+  transform: translateY(-1px);
+  text-decoration: none;
+}
+
+.recent-query:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.recent-query-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.recent-query-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 50%;
+  font-size: 14px;
+  line-height: 1;
+  transition: transform 0.15s, background 0.15s;
+}
+
+.recent-query:hover .recent-query-arrow {
+  background: var(--card);
+  transform: translate(1px, -1px);
+}
+
 /* ------------------------------------------------ cards / panels */
 .panel {
   background: var(--card);
@@ -779,6 +874,7 @@ table.gpa tr:last-child td {
   .comment,
   .teacher-list li,
   .search-form,
+  .recent-queries-track,
   .search-form input:focus {
     animation: none;
   }

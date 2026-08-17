@@ -18,6 +18,12 @@ export function rateLimit(
   limit: number,
   windowMs: number
 ): { allowed: boolean; remaining: number; retryAfter: number } {
+  if (!Number.isSafeInteger(limit) || limit <= 0) {
+    throw new RangeError('limit must be a positive safe integer');
+  }
+  if (!Number.isFinite(windowMs) || windowMs <= 0) {
+    throw new RangeError('windowMs must be a positive finite number');
+  }
   const now = Date.now();
   if (now >= nextPruneAt) {
     pruneWindows(now, windowMs);
@@ -31,6 +37,10 @@ export function rateLimit(
       windows.delete(oldest);
     }
     win = { timestamps: [], lastSeen: now };
+    windows.set(key, win);
+  } else {
+    // 刷新 Map 插入顺序，使容量淘汰近似 LRU，避免活跃客户端先于陈旧客户端被移除。
+    windows.delete(key);
     windows.set(key, win);
   }
   win.lastSeen = now;

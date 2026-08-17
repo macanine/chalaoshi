@@ -102,9 +102,9 @@ Dashboard → 对应 Worker → **Settings** → **Domains & Routes** → **Add 
 |---|---|---|
 | `CHALAOSHI_WEB_BASE` | `https://dahua309.uk,https://chalaoshi.de` | 网页域,逗号分隔,按顺序 failover |
 | `CHALAOSHI_API_BASE` | `https://api.dahua309.uk,https://api.chalaoshi.de` | API 域(评论/绩点),同样 failover |
-| `CHALAOSHI_TIMEOUT_MS` | `8000` | 单个上游请求超时(ms);上游实测 3~7s,设 8s 留余量——太短会导致每次超时并熔断域名,整站 502 |
+| `CHALAOSHI_TIMEOUT_MS` | `8000` | 单个上游请求超时(ms)，接受 `3000`–`120000` 的整数；其他值回退到默认值 |
 | `FAILOVER_COOLDOWN_MS` | `60000` | 域名失败后被熔断的冷却时长(ms) |
-| `RATE_LIMIT_PER_MIN` | `60` | 每 IP 每分钟 API 上限,`0` 关闭 |
+| `RATE_LIMIT_PER_MIN` | `60` | 每 IP 每分钟 API 上限，接受 `0`–`1000` 的整数，`0` 关闭 |
 
 **换上游域名只需改 `wrangler.jsonc` 的 vars(或 Dashboard 变量),不用动代码。** 被拦/超时的域名会自动熔断,冷却后自动恢复;所有域名都在冷却期时仍会按优先级真试一次,上游恢复后立刻重新可用。
 
@@ -116,7 +116,7 @@ Dashboard → 对应 Worker → **Settings** → **Domains & Routes** → **Add 
 curl -i https://<你的域名>/api/health?probe=1
 ```
 
-- 返回 `{"status":"ok", ..., "servedBy": "..."}` 说明正常;`servedBy` 是本次实际响应的上游域。
+- 返回 `{"ok":true, ..., "upstreamProbe":{"ok":true,"servedBy":"..."}}` 说明探测正常；`servedBy` 是本次实际响应的上游域。
 - `disabled` 数组里列出的是当前被熔断(跳过)的域,冷却后会自动恢复。
 - 页面:直接访问 `https://<你的域名>/?q=陈建海` 应能搜出结果。
 

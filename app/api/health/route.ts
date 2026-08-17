@@ -1,9 +1,10 @@
 import { cacheSize } from '@/lib/cache';
 import { searchTeachers, upstreamConfig } from '@/lib/chalaoshi';
-import { enforceRateLimit, errorBody, json } from '@/lib/http';
+import { corsPreflight, enforceRateLimit, errorBody, json } from '@/lib/http';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60; // Vercel: 上游探测可能超过默认 10s, 放宽到 60s
+export const OPTIONS = corsPreflight;
 
 /** 健康检查: 默认本地信息; ?probe=1 时真实走一次搜索(经过 failover + 熔断) */
 export async function GET(req: Request) {

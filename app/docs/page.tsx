@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import ApiDocsClient from '@/components/ApiDocsClient';
+import SkillGuide from '@/components/SkillGuide';
 import './docs.css';
 
 export const metadata: Metadata = { title: 'API' };
@@ -70,16 +70,16 @@ export default function ApiDocsPage() {
     <article className="docs">
       <header className="docs-head">
         <h1>API</h1>
-        <p>代理自 chalaoshi.de 的浙大老师教评数据接口, 全部 GET, 无需鉴权。</p>
+        <p>代理自 chalaoshi.de 的浙大老师教评数据接口, 全部 GET, 无需鉴权, 支持 CORS 预检。</p>
       </header>
 
-      <ApiDocsClient />
+      <SkillGuide />
 
       <section className="docs-section">
         <h2>端点</h2>
 
         <Endpoint
-          path="/api/search?q=<名字或拼音>"
+          path="/api/search"
           desc="按姓名或拼音搜索老师, 返回候选列表(支持模糊匹配)。"
           params={[['q', 'string(必填)', '老师姓名或拼音, 如 陈建海 / chenjianhai']]}
           exampleUrl="/api/search?q=陈建海"
@@ -93,27 +93,33 @@ export default function ApiDocsPage() {
         />
 
         <Endpoint
-          path="/api/comments/<tid>?sort=time|rate&limit=20&offset=0"
+          path="/api/comments/<tid>"
           desc="评论列表, 支持分页与排序。sort=time 最新在前, sort=rate 赞最多在前; 响应含 total / hasMore 便于分页。"
           params={[
             ['tid', 'string(必填)', '老师数字 ID'],
             ['sort', 'time | rate', '排序方式, 默认 time'],
             ['limit', 'number', '每页条数, 1–100, 默认 20'],
-            ['offset', 'number', '偏移量, 默认 0'],
+            ['offset', 'number', '偏移量, 0–100000 的整数, 默认 0'],
           ]}
           exampleUrl="/api/comments/1902?sort=time&limit=20"
         />
 
         <Endpoint
-          path="/api/gpa?course=<课程名>"
+          path="/api/gpa"
           desc="列出该课所有任课老师的平均绩点(±标准差)与上报人数, 按绩点排序。数据来自「课否」。"
           params={[['course', 'string(必填)', '课程名, 支持模糊匹配']]}
           exampleUrl="/api/gpa?course=程序设计基础及实验"
         />
 
         <Endpoint
-          path="/api/health[?probe=1]"
-          desc="代理存活检查。加 probe=1 时真实探测上游 chalaoshi.de 是否可访问。"
+          path="/api/recent"
+          desc="返回当前运行实例最近成功访问的老师，以及最近查询且有绩点数据的课程，不足时附默认推荐项。数据只存在内存中，重启会清空，多实例之间不共享。"
+          exampleUrl="/api/recent"
+        />
+
+        <Endpoint
+          path="/api/health"
+          desc="代理存活检查。响应以 ok 表示状态；加 probe=1 时真实探测上游 chalaoshi.de，探测失败返回 502。"
           exampleUrl="/api/health"
         />
       </section>

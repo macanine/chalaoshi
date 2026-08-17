@@ -64,7 +64,7 @@ lib/
 ### Cloudflare 与配置
 
 1. 环境变量只可在请求时读取。Cloudflare Worker 的 `process.env` 填充晚于模块加载，禁止模块级读取配置。
-2. `next dev` 不会把 `wrangler.jsonc` 的 vars 填入 `process.env`；本地差异写入 `.env.local`。`wrangler.jsonc` 用于部署和 `cf:preview`。
+2. `next.config.ts` 通过 `initOpenNextCloudflareForDev()` 把 `wrangler.jsonc` 的 vars 注入 `next dev`；本地专属覆盖仍写入 `.env.local`，部署和 `cf:preview` 以 `wrangler.jsonc` 为准。
 3. 配置值必须校验有限性和合理范围，尤其是 TTL、超时、冷却期与每分钟限流。
 4. 不要改为 Next 数据缓存或上游 `fetch` 缓存。该项目依靠显式内存 TTL 缓存和 `cache: 'no-store'` 控制陈旧数据。
 

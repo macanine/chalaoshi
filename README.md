@@ -25,17 +25,17 @@ pnpm dev   # http://localhost:3000
 | `CHALAOSHI_WEB_BASE` | `https://dahua309.uk,https://chalaoshi.de` | 网页域，逗号分隔多个，按顺序 failover |
 | `CHALAOSHI_API_BASE` | `https://api.dahua309.uk,https://api.chalaoshi.de` | API 域（评论 / 绩点），同样支持 failover |
 | `CHALAOSHI_FALLBACK` | 空 | 同类镜像站兜底：主域名全部失败（被拦 / 超时 / 5xx）后改试这里，逗号分隔，留空不启用 |
-| `CHALAOSHI_TIMEOUT_MS` | `8000` | 上游请求超时（毫秒）；上游实测 3~7s，设 8s 留余量，太短会让每次都超时并熔断域名 |
+| `CHALAOSHI_TIMEOUT_MS` | `8000` | 上游请求超时（毫秒），接受 `3000`–`120000` 的整数；其他值回退到默认值 |
 | `FAILOVER_COOLDOWN_MS` | `60000` | 域名失败后被熔断的冷却时长（毫秒），冷却后自动恢复 |
 | `CACHE_TTL_SEARCH` | `60` | 搜索结果缓存（秒） |
 | `CACHE_TTL_TEACHER` | `300` | 老师详情缓存（秒） |
 | `CACHE_TTL_COMMENTS` | `60` | 评论缓存（秒） |
 | `CACHE_TTL_GPA` | `1800` | 绩点缓存（秒） |
-| `RATE_LIMIT_PER_MIN` | `60` | 每 IP 每分钟 API 上限，`0` 关闭 |
+| `RATE_LIMIT_PER_MIN` | `60` | 每 IP 每分钟 API 上限，接受 `0`–`1000` 的整数，`0` 关闭；其他值回退到默认值 |
 
 ## API
 
-所有端点 `GET`、返回 JSON、带 CORS。`/api` 返回机器可读的端点索引，`/docs` 是渲染版文档页。
+所有端点 `GET`、返回 JSON、带 CORS，并支持浏览器 `OPTIONS` 预检。`/api` 返回机器可读的端点索引，`/docs` 是渲染版文档页。
 
 | 端点 | 返回 |
 |---|---|
@@ -43,13 +43,14 @@ pnpm dev   # http://localhost:3000
 | `GET /api/teacher/<tid>` | `{ tid, name, college, score, ratingCount, rollCallRate, commentCount, courses: [{ name, gpa, count }] }` |
 | `GET /api/comments/<tid>?sort=time\|rate&limit=20&offset=0` | `{ tid, sort, total, offset, limit, hasMore, comments: [{ id, content, likes, date }] }` |
 | `GET /api/gpa?course=<课程名>` | `{ course, count, rows: [{ teacher, gpa, count }] }` |
+| `GET /api/recent` | 当前实例最近成功访问的老师、最近查到绩点的课程；不足时补默认推荐项 |
 | `GET /api/health[?probe=1]` | 存活与上游配置；`probe=1` 时真实走一次上游搜索 |
 
 ```bash
 curl 'http://localhost:3000/api/search?q=陈建海'
 ```
 
-错误响应统一包含稳定的 `code`，例如 `{ "error": "参数缺失: 需要 q (老师姓名或拼音)", "code": "missing_query" }`。上游不可达时返回 502，并附 `upstreamStatus`（上游 HTTP 状态）和 `upstreamAttempts`（每个域名的具体失败原因）；`404` 为 `teacher_not_found`，`429` 为 `rate_limited`（带 `retryAfter`）。
+错误响应统一包含稳定的 `code`，例如 `{ "error": "参数缺失: 需要 q (老师姓名或拼音)", "code": "missing_query" }`。非法评论排序和分页分别返回 `invalid_sort`、`invalid_pagination`。上游不可达时返回 502，并附 `upstreamStatus`（上游 HTTP 状态）和 `upstreamAttempts`（每个域名的具体失败原因）；`404` 为 `teacher_not_found`，`429` 为 `rate_limited`（响应体带 `retryAfter`，响应头带 `Retry-After`）。未知内部异常不会把堆栈或异常详情返回客户端。
 
 ## 前端页面
 
@@ -58,7 +59,9 @@ curl 'http://localhost:3000/api/search?q=陈建海'
 | `/` | 首页：按老师名 / 拼音搜索，支持 `/?q=<名字>` 直达 |
 | `/course` | 按课程查各任课老师的平均绩点 |
 | `/teacher/<tid>` | 老师详情：评分、点名率、评论、课程绩点 |
-| `/docs` | 渲染版 API 文档（与 `/api` 同一份端点数据） |
+| `/docs` | 人类可读的 API 与 Agent Skill 文档 |
+
+`/api/recent` 和内存缓存一样是单实例、非持久状态：进程重启会清空，多实例部署不会相互同步，不能将它当作审计记录或精确的全站排行榜。
 
 ## 部署（双平台）
 
@@ -91,3 +94,9 @@ pnpm cf:deploy    # 构建并部署到 Cloudflare
 ## 数据说明
 
 数据来自 chalaoshi.de 匿名用户与「课否」，存在幸存者偏差，给分也有时效性——判断"给分捞不捞"建议以近期评论为准（`sort=time`）。本项目为只读代理，内置限流与缓存以减少对上游的压力。
+
+## AI 课表排布 Skill
+
+`/skills/course-schedule-planner/SKILL.md` 是遵循 Agent Skills 规范、可由 AI 读取的 Skill。它会指导兼容的 AI 综合课程平均绩点、近期给分讨论和高赞评价，再结合用户提供的班次时间生成无冲突课表。网站提供 `/skills/index.json` 目录，也可以在 `/docs` 查看安装和使用指引。
+
+在 `/docs` 点击“复制给 AI 安装”，把地址和安装指令粘贴给 AI，由 AI 自行读取并安装到它支持的 skill 目录。

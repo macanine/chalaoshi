@@ -14,7 +14,6 @@ export default async function CoursePage({
     <>
       <section className="hero">
         <h1>课程绩点对比</h1>
-        <p className="subtitle">输入课程名, 看这门课所有任课老师的平均绩点(数据来自「课否」)。</p>
       </section>
       <CourseSearch initialCourse={course} />
     </>

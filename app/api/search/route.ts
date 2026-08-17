@@ -1,9 +1,10 @@
 import type { NextRequest } from 'next/server';
 import { searchTeachers } from '@/lib/chalaoshi';
-import { enforceRateLimit, handleError, json } from '@/lib/http';
+import { corsPreflight, enforceRateLimit, handleError, json } from '@/lib/http';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60; // Vercel: 上游抓取可能超过默认 10s, 放宽到 60s
+export const OPTIONS = corsPreflight;
 
 export async function GET(req: NextRequest) {
   const rl = enforceRateLimit(req);

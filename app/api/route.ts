@@ -1,9 +1,10 @@
-import { API_ENDPOINTS } from '@/lib/apiEndpoints';
+import { API_ENDPOINTS, SKILL_CATALOG } from '@/lib/apiEndpoints';
 import { upstreamConfig } from '@/lib/chalaoshi';
-import { enforceRateLimit, json } from '@/lib/http';
+import { corsPreflight, enforceRateLimit, json } from '@/lib/http';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60; // Vercel: 上游抓取可能超过默认 10s, 放宽到 60s
+export const OPTIONS = corsPreflight;
 
 /** API 索引: 结构化 JSON, 直接给 AI / 开发者用。人类看的渲染版在 /docs。 */
 export function GET(req: Request) {
@@ -19,5 +20,6 @@ export function GET(req: Request) {
     note: '所有端点都支持 CORS 与内存缓存; 数据存在幸存者偏差, 给分有时效性。',
     upstream: { web: webBases, api: apiBases, disabled: disabledBases },
     endpoints: API_ENDPOINTS,
+    skills: [SKILL_CATALOG],
   });
 }

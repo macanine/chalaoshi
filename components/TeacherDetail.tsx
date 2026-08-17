@@ -15,6 +15,35 @@ type State =
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
+function isTeacherDetail(value: unknown): value is TeacherDetailData {
+  if (!value || typeof value !== 'object') return false;
+  const detail = value as Partial<TeacherDetailData>;
+  return (
+    typeof detail.tid === 'string' &&
+    typeof detail.name === 'string' &&
+    typeof detail.college === 'string' &&
+    typeof detail.score === 'string' &&
+    typeof detail.ratingCount === 'string' &&
+    typeof detail.rollCallRate === 'string' &&
+    typeof detail.commentCount === 'string' &&
+    Array.isArray(detail.courses) &&
+    detail.courses.every(
+      (course) =>
+        course !== null &&
+        typeof course === 'object' &&
+        typeof course.name === 'string' &&
+        typeof course.gpa === 'string' &&
+        typeof course.count === 'string'
+    )
+  );
+}
+
+function apiError(data: unknown, fallback: string): string {
+  return data !== null && typeof data === 'object' && typeof (data as { error?: unknown }).error === 'string'
+    ? (data as { error: string }).error
+    : fallback;
+}
+
 function BackBar() {
   const router = useRouter();
 
@@ -55,12 +84,17 @@ export default function TeacherDetail({ tid }: { tid: string }) {
         const data = await res.json().catch(() => ({}));
         if (!alive) return;
         if (!res.ok) {
-          setState({ status: 'error', message: data.error || '加载失败', is404: res.status === 404 });
+          setState({ status: 'error', message: apiError(data, '加载失败'), is404: res.status === 404 });
+          return;
+        }
+        if (!isTeacherDetail(data)) {
+          setState({ status: 'error', message: '服务返回了无效的老师数据', is404: false });
           return;
         }
         clientCacheSet(key, data, CACHE_TTL_MS);
         setState({ status: 'ready', d: data });
         document.title = `${data.name} · ${data.college} · 查老师`;
+        window.dispatchEvent(new Event('recent-queries-updated'));
       } catch (err) {
         if (!alive) return;
         if (err instanceof DOMException && err.name === 'AbortError') return;

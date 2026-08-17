@@ -96,7 +96,7 @@ function getFallbackBases(): string[] {
 
 function getTimeoutMs(): number {
   const value = Number(process.env.CHALAOSHI_TIMEOUT_MS ?? 8000);
-  return Number.isFinite(value) && value > 0 ? Math.min(Math.floor(value), 120_000) : 8000;
+  return Number.isInteger(value) && value >= 3000 && value <= 120_000 ? value : 8000;
 }
 
 function getCooldownMs(): number {

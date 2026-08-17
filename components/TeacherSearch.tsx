@@ -3,10 +3,28 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { TeacherHit } from '@/lib/types';
 import TeacherCard from './TeacherCard';
+import RecentQueries from './RecentQueries';
 import { clientCacheGet, clientCacheSet } from '@/lib/clientCache';
 
 const DEBOUNCE_MS = 300;
 const CACHE_TTL_MS = 2 * 60 * 1000;
+
+function isTeacherHit(value: unknown): value is TeacherHit {
+  if (!value || typeof value !== 'object') return false;
+  const hit = value as Partial<TeacherHit>;
+  return (
+    typeof hit.tid === 'string' &&
+    typeof hit.name === 'string' &&
+    typeof hit.college === 'string' &&
+    typeof hit.score === 'string'
+  );
+}
+
+function apiError(data: unknown, fallback: string): string {
+  return data !== null && typeof data === 'object' && typeof (data as { error?: unknown }).error === 'string'
+    ? (data as { error: string }).error
+    : fallback;
+}
 
 export default function TeacherSearch({ initialQ = '' }: { initialQ?: string }) {
   const [q, setQ] = useState(initialQ);
@@ -39,8 +57,11 @@ export default function TeacherSearch({ initialQ = '' }: { initialQ?: string }) 
     try {
       const res = await fetch('/api/search?q=' + encodeURIComponent(kw), { signal: controller.signal });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || '查询失败');
-      const list = data.teachers ?? [];
+      if (!res.ok) throw new Error(apiError(data, '查询失败'));
+      if (!Array.isArray(data.teachers) || !data.teachers.every(isTeacherHit)) {
+        throw new Error('服务返回了无效的老师数据');
+      }
+      const list: TeacherHit[] = data.teachers;
       clientCacheSet(key, list, CACHE_TTL_MS);
       if (seq !== seqRef.current) return; // 已被更新的请求取代
       setTeachers(list);
@@ -62,8 +83,17 @@ export default function TeacherSearch({ initialQ = '' }: { initialQ?: string }) 
     const kw = initialQ.trim();
     if (kw) {
       setQ(initialQ);
-      runSearch(kw);
+      void runSearch(kw);
+      return;
     }
+    if (timerRef.current) clearTimeout(timerRef.current);
+    requestRef.current?.abort();
+    seqRef.current += 1;
+    setQ('');
+    setLoading(false);
+    setError(null);
+    setTeachers(null);
+    setSearched('');
   }, [initialQ, runSearch]);
 
   useEffect(() => () => {
@@ -92,6 +122,7 @@ export default function TeacherSearch({ initialQ = '' }: { initialQ?: string }) 
 
   function doSearch(e?: React.FormEvent) {
     e?.preventDefault();
+    if (composingRef.current) return;
     if (timerRef.current) clearTimeout(timerRef.current);
     const kw = q.trim();
     if (!kw) return;
@@ -125,6 +156,8 @@ export default function TeacherSearch({ initialQ = '' }: { initialQ?: string }) 
           {loading ? '搜索中…' : '搜索'}
         </button>
       </form>
+
+      {!q.trim() && !searched && <RecentQueries kind="teacher" />}
 
       {error && <div className="error-note">{error}</div>}
 

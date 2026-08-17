@@ -3,10 +3,23 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { GpaRow } from '@/lib/types';
 import GpaTable from './GpaTable';
+import RecentQueries from './RecentQueries';
 import { clientCacheGet, clientCacheSet } from '@/lib/clientCache';
 
 const DEBOUNCE_MS = 300;
 const CACHE_TTL_MS = 10 * 60 * 1000;
+
+function isGpaRow(value: unknown): value is GpaRow {
+  if (!value || typeof value !== 'object') return false;
+  const row = value as Partial<GpaRow>;
+  return typeof row.teacher === 'string' && typeof row.gpa === 'string' && typeof row.count === 'string';
+}
+
+function apiError(data: unknown, fallback: string): string {
+  return data !== null && typeof data === 'object' && typeof (data as { error?: unknown }).error === 'string'
+    ? (data as { error: string }).error
+    : fallback;
+}
 
 export default function CourseSearch({ initialCourse = '' }: { initialCourse?: string }) {
   const [course, setCourse] = useState(initialCourse);
@@ -39,10 +52,14 @@ export default function CourseSearch({ initialCourse = '' }: { initialCourse?: s
     try {
       const res = await fetch('/api/gpa?course=' + encodeURIComponent(kw), { signal: controller.signal });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || '查询失败');
-      const list = data.rows ?? [];
+      if (!res.ok) throw new Error(apiError(data, '查询失败'));
+      if (!Array.isArray(data.rows) || !data.rows.every(isGpaRow)) {
+        throw new Error('服务返回了无效的绩点数据');
+      }
+      const list: GpaRow[] = data.rows;
       clientCacheSet(key, list, CACHE_TTL_MS);
       if (seq !== seqRef.current) return;
+      if (list.length > 0) window.dispatchEvent(new Event('recent-queries-updated'));
       setRows(list);
     } catch (err) {
       if (seq !== seqRef.current) return;
@@ -63,7 +80,16 @@ export default function CourseSearch({ initialCourse = '' }: { initialCourse?: s
     if (kw) {
       setCourse(initialCourse);
       void runSearch(kw);
+      return;
     }
+    if (timerRef.current) clearTimeout(timerRef.current);
+    requestRef.current?.abort();
+    seqRef.current += 1;
+    setCourse('');
+    setLoading(false);
+    setError(null);
+    setRows(null);
+    setSearched('');
   }, [initialCourse, runSearch]);
 
   useEffect(() => () => {
@@ -91,6 +117,7 @@ export default function CourseSearch({ initialCourse = '' }: { initialCourse?: s
 
   function doSearch(e?: React.FormEvent) {
     e?.preventDefault();
+    if (composingRef.current) return;
     if (timerRef.current) clearTimeout(timerRef.current);
     const kw = course.trim();
     if (!kw) return;
@@ -124,6 +151,8 @@ export default function CourseSearch({ initialCourse = '' }: { initialCourse?: s
           {loading ? '查询中…' : '查询'}
         </button>
       </form>
+
+      {!course.trim() && !searched && <RecentQueries kind="course" />}
 
       {error && <div className="error-note">{error}</div>}
 

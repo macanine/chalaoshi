@@ -1,0 +1,11 @@
+{
+  "skills": [
+    {
+      "name": "course-schedule-planner",
+      "description": "根据平均绩点、近期给分讨论和高赞评价比较老师，并生成无冲突课表方案。",
+      "url": "/skills/course-schedule-planner/SKILL.md",
+      "format": "agentskills",
+      "version": "1.0"
+    }
+  ]
+}

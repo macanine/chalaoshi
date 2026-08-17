@@ -43,4 +43,22 @@ export interface GpaRow {
   count: string;
 }
 
+/** 服务端全站最近访问的老师。 */
+export interface RecentTeacher {
+  /** 真实老师详情的 tid；默认推荐项没有唯一 tid，跳转到姓名搜索。 */
+  tid?: string;
+  name: string;
+  college?: string;
+}
+
+/** 服务端全站最近查询且有结果的课程。 */
+export interface RecentCourse {
+  course: string;
+}
+
+export interface RecentQueries {
+  teachers: RecentTeacher[];
+  courses: RecentCourse[];
+}
+
 export type CommentSort = 'time' | 'rate';
