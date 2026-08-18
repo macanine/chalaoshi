@@ -701,8 +701,39 @@ textarea {
 
 .load-more {
   display: flex;
+  align-items: center;
   justify-content: center;
+  min-height: 62px;
   padding-top: 18px;
+}
+
+.load-more-btn {
+  min-width: 132px;
+}
+
+.load-more-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  opacity: 0;
+}
+
+.load-more-btn[aria-busy='true'] .load-more-spinner {
+  opacity: 1;
+  animation: spin 0.7s linear infinite;
+}
+
+.load-more-note {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 132px;
+  min-height: 44px;
+  color: var(--muted);
+  font-size: 13px;
 }
 
 .comment-list-skeleton .comment {
@@ -871,6 +902,7 @@ table.gpa tr:last-child td {
 @media (prefers-reduced-motion: reduce) {
   .skeleton::after,
   .spinner,
+  .load-more-btn[aria-busy='true'] .load-more-spinner,
   .comment,
   .teacher-list li,
   .search-form,
@@ -931,15 +963,36 @@ table.gpa tr:last-child td {
   position: sticky;
   bottom: 0;
   z-index: 15;
+  flex: 0 0 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
   background: var(--glass-bg);
   backdrop-filter: blur(18px) saturate(170%);
   -webkit-backdrop-filter: blur(18px) saturate(170%);
   border-top: 1px solid var(--glass-border);
   box-shadow: 0 -1px 0 rgba(16, 24, 40, 0.02), 0 -8px 24px -14px rgba(16, 24, 40, 0.14);
-  padding: 12px 0;
+  padding: 0;
   color: var(--muted);
   font-size: 13px;
   text-align: center;
+}
+
+.site-footer .container {
+  line-height: 20px;
+}
+
+.site-pv {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.site-pv-value {
+  display: inline-block;
+  width: 8ch;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ------------------------------------------------ responsive */

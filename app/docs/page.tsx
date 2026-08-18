@@ -71,6 +71,9 @@ export default function ApiDocsPage() {
       <header className="docs-head">
         <h1>API</h1>
         <p>代理自 chalaoshi.de 的浙大老师教评数据接口, 全部 GET, 无需鉴权, 支持 CORS 预检。</p>
+        <p>
+          老师评价数据来自匿名用户上报，课程绩点数据来自「课否」；均为历史数据，仅供学习参考。
+        </p>
       </header>
 
       <SkillGuide />

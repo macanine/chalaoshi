@@ -266,14 +266,20 @@ export default function CommentSection({
         ))}
 
       <div ref={sentinelRef} className="load-more">
-        {hasMore &&
-          (loading ? (
-            <span className="spinner" role="status" aria-label="加载中" />
-          ) : (
-            <button type="button" className="btn ghost" onClick={() => void loadMore()} disabled={loading}>
-              加载更多 ({comments.length}/{total})
-            </button>
-          ))}
+        {hasMore ? (
+          <button
+            type="button"
+            className="btn ghost load-more-btn"
+            onClick={() => void loadMore()}
+            disabled={loading}
+            aria-busy={loading}
+          >
+            <span className="load-more-spinner" aria-hidden={!loading} />
+            <span>加载更多</span>
+          </button>
+        ) : (
+          <span className="load-more-note">已显示全部评论</span>
+        )}
       </div>
     </section>
   );

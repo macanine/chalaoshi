@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import Link from 'next/link';
+import Script from 'next/script';
 import './globals.css';
 import BottomNav from '@/components/BottomNav';
 
@@ -65,13 +66,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <BottomNav />
         <footer className="site-footer">
           <div className="container">
-            数据来自{' '}
-            <a href="https://chalaoshi.de" target="_blank" rel="noreferrer">
-              原站 chalaoshi.de
-            </a>
-            , 仅供学习参考
+            <span className="site-pv" id="vercount_container_site_pv">
+              本站访问 <span className="site-pv-value" id="vercount_value_site_pv" aria-live="polite">000000</span> 次
+            </span>
           </div>
         </footer>
+        <Script src="https://events.vercount.one/js" strategy="afterInteractive" />
       </body>
     </html>
   );
