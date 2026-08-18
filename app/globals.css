@@ -699,39 +699,68 @@ textarea {
   font-weight: 600;
 }
 
-.load-more {
+.pagination {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
+  gap: 8px;
   min-height: 62px;
   padding-top: 18px;
 }
 
-.load-more-btn {
-  min-width: 132px;
+.pagination-pages {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
 }
 
-.load-more-spinner {
-  display: inline-block;
-  width: 16px;
-  height: 16px;
-  border: 2px solid var(--border);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  opacity: 0;
+.pagination-nav,
+.pagination-page {
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0 10px;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 
-.load-more-btn[aria-busy='true'] .load-more-spinner {
-  opacity: 1;
-  animation: spin 0.7s linear infinite;
+.pagination-page {
+  padding: 0;
 }
 
-.load-more-note {
+.pagination-nav:hover:not(:disabled),
+.pagination-page:hover:not(:disabled) {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.pagination-page.active {
+  color: var(--accent-ink);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.pagination-nav:disabled,
+.pagination-page:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.pagination-gap {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 132px;
-  min-height: 44px;
+  min-width: 16px;
+  min-height: 40px;
   color: var(--muted);
   font-size: 13px;
 }
@@ -902,7 +931,6 @@ table.gpa tr:last-child td {
 @media (prefers-reduced-motion: reduce) {
   .skeleton::after,
   .spinner,
-  .load-more-btn[aria-busy='true'] .load-more-spinner,
   .comment,
   .teacher-list li,
   .search-form,
@@ -1094,6 +1122,20 @@ table.gpa tr:last-child td {
     flex: 1;
     padding: 9px 0;
     text-align: center;
+  }
+
+  .pagination {
+    gap: 4px;
+  }
+
+  .pagination-nav,
+  .pagination-page {
+    min-width: 36px;
+    min-height: 40px;
+  }
+
+  .pagination-nav {
+    padding-inline: 8px;
   }
 
   .comment-body {

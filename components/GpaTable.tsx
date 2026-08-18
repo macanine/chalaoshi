@@ -6,13 +6,6 @@ function gpaNum(g: string): number {
   return Number.isNaN(n) ? -1 : n;
 }
 
-function gpaClass(g: string): string {
-  const n = gpaNum(g);
-  if (n >= 4.0) return 'high';
-  if (n >= 3.5) return 'mid';
-  return 'low';
-}
-
 export default function GpaTable({ rows }: { rows: GpaRow[] }) {
   const sorted = [...rows].sort((a, b) => gpaNum(b.gpa) - gpaNum(a.gpa));
 
@@ -24,29 +17,14 @@ export default function GpaTable({ rows }: { rows: GpaRow[] }) {
       {sorted.length === 0 ? (
         <p className="results-count">这门课还没有绩点数据。</p>
       ) : (
-        <div className="table-wrap">
-          <table className="gpa">
-            <thead>
-              <tr>
-                <th>老师</th>
-                <th>平均绩点 ± 标准差</th>
-                <th>人数</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sorted.map((r) => (
-                <tr key={r.teacher + r.gpa}>
-                  <td>
-                    <Link className="gpa-teacher" href={`/?q=${encodeURIComponent(r.teacher)}`}>
-                      {r.teacher}
-                    </Link>
-                  </td>
-                  <td className={`gpa-val ${gpaClass(r.gpa)}`}>{r.gpa || '—'}</td>
-                  <td>{r.count || '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="course-grid">
+          {sorted.map((r) => (
+            <Link className="course-chip course-chip-link" href={`/?q=${encodeURIComponent(r.teacher)}`} key={r.teacher + r.gpa}>
+              <span className="course-chip-name">{r.teacher}</span>
+              <span className="course-chip-gpa">{r.gpa || '—'}</span>
+              <span className="course-chip-count">{r.count ? `${r.count} 人` : '—'}</span>
+            </Link>
+          ))}
         </div>
       )}
 

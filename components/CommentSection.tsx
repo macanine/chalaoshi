@@ -3,12 +3,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Comment, CommentSort } from '@/lib/types';
 
-const PAGE = 20;
+const PAGE_SIZE = 20;
 
 interface PageState {
   comments: Comment[];
   total: number;
-  offset: number;
+  page: number;
 }
 
 function isComment(value: unknown): value is Comment {
@@ -29,12 +29,24 @@ function apiError(data: unknown, fallback: string): string {
     : fallback;
 }
 
+function pageItems(current: number, total: number): Array<number | 'gap'> {
+  const pages = new Set([1, current, total]);
+  const ordered = [...pages].filter((page) => page >= 1 && page <= total).sort((a, b) => a - b);
+  const items: Array<number | 'gap'> = [];
+  let previous = 0;
+
+  for (const page of ordered) {
+    if (page > previous + 1) items.push('gap');
+    items.push(page);
+    previous = page;
+  }
+
+  return items;
+}
+
 /**
- * 评论列表。
- * 平滑切换优化:
- *  - 每种排序独立缓存(pages), 已看过的排序切回是瞬间的;
- *  - 首次加载完某排序后, 后台预取另一种排序的第一页, 下次切换不再等网络;
- *  - 切换时保留当前列表, 不整块闪烁; 同一时刻只允许一个请求(单飞), 避免竞态。
+ * 显式页码分页的评论列表。
+ * 每个排序和页码独立缓存；切换时保留上一页内容直到目标页准备好，避免整块闪烁。
  */
 export default function CommentSection({
   tid,
@@ -44,31 +56,31 @@ export default function CommentSection({
   defaultSort?: CommentSort;
 }) {
   const [sort, setSort] = useState<CommentSort>(defaultSort);
+  const [page, setPage] = useState(1);
   const [comments, setComments] = useState<Comment[]>([]);
   const [total, setTotal] = useState(0);
-  const [offset, setOffset] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const pages = useRef<Partial<Record<CommentSort, PageState>>>({});
-  const sortRef = useRef(sort);
-  sortRef.current = sort;
+  const pagesRef = useRef(new Map<string, PageState>());
   const busyRef = useRef(false);
   const seqRef = useRef(0);
-  const sentinelRef = useRef<HTMLDivElement | null>(null);
   const requestsRef = useRef(new Map<string, Promise<PageState>>());
   const controllersRef = useRef(new Map<string, AbortController>());
 
+  const cacheKey = (s: CommentSort, targetPage: number) => `${s}:${targetPage}`;
+
   const loadPage = useCallback(
-    (s: CommentSort, off: number): Promise<PageState> => {
-      const key = `${s}:${off}`;
+    (s: CommentSort, targetPage: number): Promise<PageState> => {
+      const key = `${s}:${targetPage}`;
       const pending = requestsRef.current.get(key);
       if (pending) return pending;
 
       const controller = new AbortController();
       controllersRef.current.set(key, controller);
+      const offset = (targetPage - 1) * PAGE_SIZE;
       const request = (async () => {
-        const res = await fetch(`/api/comments/${tid}?sort=${s}&limit=${PAGE}&offset=${off}`, {
+        const res = await fetch(`/api/comments/${tid}?sort=${s}&limit=${PAGE_SIZE}&offset=${offset}`, {
           signal: controller.signal,
         });
         const data = await res.json().catch(() => ({}));
@@ -81,9 +93,9 @@ export default function CommentSection({
         ) {
           throw new Error('服务返回了无效的评论数据');
         }
-        const comments: Comment[] = data.comments;
-        return { comments, total: data.total, offset: off + comments.length };
+        return { comments: data.comments, total: data.total, page: targetPage };
       })();
+
       requestsRef.current.set(key, request);
       void request
         .finally(() => {
@@ -96,77 +108,43 @@ export default function CommentSection({
     [tid]
   );
 
-  const adopt = useCallback((s: CommentSort, st: PageState) => {
-    setComments(st.comments);
-    setTotal(st.total);
-    setOffset(st.offset);
+  const adopt = useCallback((s: CommentSort, state: PageState) => {
+    setSort(s);
+    setPage(state.page);
+    setComments(state.comments);
+    setTotal(state.total);
   }, []);
 
-  /** 后台预取另一种排序的第一页, 让之后的切换秒开 */
-  function prefetchOther(s: CommentSort) {
+  function prefetchOtherSort(s: CommentSort) {
     const other: CommentSort = s === 'time' ? 'rate' : 'time';
-    if (pages.current[other]) return;
-    loadPage(other, 0)
-      .then((od) => {
-        const existing = pages.current[other];
-        if (!existing || existing.offset === 0) pages.current[other] = od;
-      })
+    const key = cacheKey(other, 1);
+    if (pagesRef.current.has(key)) return;
+
+    loadPage(other, 1)
+      .then((state) => pagesRef.current.set(key, state))
       .catch(() => {});
   }
 
-  /** 加载(或复用)某个排序并切换过去 */
-  async function loadSort(s: CommentSort) {
-    if (busyRef.current) return;
+  async function showPage(s: CommentSort, targetPage: number) {
+    if (busyRef.current || targetPage < 1) return;
     busyRef.current = true;
     const seq = ++seqRef.current;
-    setSort(s);
+    const key = cacheKey(s, targetPage);
     setError(null);
+
     try {
-      const cached = pages.current[s];
+      const cached = pagesRef.current.get(key);
       if (cached) {
-        adopt(s, cached);
+        if (seq === seqRef.current) adopt(s, cached);
         return;
       }
+
       setLoading(true);
-      const st = await loadPage(s, 0);
+      const state = await loadPage(s, targetPage);
       if (seq !== seqRef.current) return;
-      pages.current[s] = st;
-      adopt(s, st);
-      prefetchOther(s);
-    } catch (err) {
-      if (seq === seqRef.current) setError(err instanceof Error ? err.message : '加载失败');
-    } finally {
-      if (seq === seqRef.current) {
-        busyRef.current = false;
-        setLoading(false);
-      }
-    }
-  }
-
-  function onSwitch(s: CommentSort) {
-    if (s === sortRef.current || busyRef.current) return;
-    void loadSort(s);
-  }
-
-  async function loadMore() {
-    if (busyRef.current) return;
-    const s = sortRef.current;
-    const st = pages.current[s];
-    if (!st || st.offset >= st.total) return;
-    busyRef.current = true;
-    const seq = ++seqRef.current;
-    setError(null);
-    setLoading(true);
-    try {
-      const next = await loadPage(s, st.offset);
-      if (seq !== seqRef.current) return;
-      const merged: PageState = {
-        comments: [...st.comments, ...next.comments],
-        total: next.total,
-        offset: next.offset,
-      };
-      pages.current[s] = merged;
-      adopt(s, merged);
+      pagesRef.current.set(key, state);
+      adopt(s, state);
+      if (targetPage === 1) prefetchOtherSort(s);
     } catch (err) {
       if (seq === seqRef.current) setError(err instanceof Error ? err.message : '加载失败');
     } finally {
@@ -178,35 +156,19 @@ export default function CommentSection({
   }
 
   useEffect(() => {
-    void loadSort(defaultSort);
+    void showPage(defaultSort, 1);
     return () => {
       seqRef.current += 1;
       for (const controller of controllersRef.current.values()) controller.abort();
       controllersRef.current.clear();
       requestsRef.current.clear();
+      pagesRef.current.clear();
     };
+    // Initial load is scoped to this component instance, which is keyed by tid.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 滚动接近底部自动加载下一页; 哨兵元素始终渲染, 由回调判断是否值得加载
-  useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el) return;
-    const ob = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) {
-          const st = pages.current[sortRef.current];
-          if (st && st.offset < st.total && !busyRef.current) void loadMore();
-        }
-      },
-      { rootMargin: '400px 0px' }
-    );
-    ob.observe(el);
-    return () => ob.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const hasMore = offset < total;
+  const totalPages = Math.ceil(total / PAGE_SIZE);
 
   return (
     <section className="panel">
@@ -219,16 +181,18 @@ export default function CommentSection({
         <button
           type="button"
           className={`tab ${sort === 'time' ? 'active' : ''}`}
-          onClick={() => onSwitch('time')}
+          onClick={() => void showPage('time', 1)}
           aria-pressed={sort === 'time'}
+          disabled={loading}
         >
           最新
         </button>
         <button
           type="button"
           className={`tab ${sort === 'rate' ? 'active' : ''}`}
-          onClick={() => onSwitch('rate')}
+          onClick={() => void showPage('rate', 1)}
           aria-pressed={sort === 'rate'}
+          disabled={loading}
         >
           人气
         </button>
@@ -248,39 +212,57 @@ export default function CommentSection({
         </div>
       )}
 
-      {!loading && comments.length === 0 && !error && (
-        <p className="results-count">还没有评论。</p>
-      )}
+      {!loading && comments.length === 0 && !error && <p className="results-count">还没有评论。</p>}
 
-      {comments.length > 0 &&
-        comments.map((c) => (
-          <article className="comment" key={c.id}>
-            <div className="comment-body">{c.content}</div>
-            <div className="comment-meta">
-              <span className="comment-likes" aria-label={`${c.likes} 个赞`}>
-                ▲ {c.likes}
-              </span>
-              <span>{c.date}</span>
-            </div>
-          </article>
-        ))}
+      {comments.map((comment) => (
+        <article className="comment" key={comment.id}>
+          <div className="comment-body">{comment.content}</div>
+          <div className="comment-meta">
+            <span className="comment-likes" aria-label={`${comment.likes} 个赞`}>▲ {comment.likes}</span>
+            <span>{comment.date}</span>
+          </div>
+        </article>
+      ))}
 
-      <div ref={sentinelRef} className="load-more">
-        {hasMore ? (
+      {totalPages > 1 && (
+        <nav className="pagination" aria-label="评论分页" aria-busy={loading}>
           <button
+            className="pagination-nav"
             type="button"
-            className="btn ghost load-more-btn"
-            onClick={() => void loadMore()}
-            disabled={loading}
-            aria-busy={loading}
+            onClick={() => void showPage(sort, page - 1)}
+            disabled={loading || page === 1}
           >
-            <span className="load-more-spinner" aria-hidden={!loading} />
-            <span>加载更多</span>
+            上一页
           </button>
-        ) : (
-          <span className="load-more-note">已显示全部评论</span>
-        )}
-      </div>
+          <div className="pagination-pages">
+            {pageItems(page, totalPages).map((item, index) =>
+              item === 'gap' ? (
+                <span className="pagination-gap" key={`gap-${index}`}>...</span>
+              ) : (
+                <button
+                  className={`pagination-page ${item === page ? 'active' : ''}`}
+                  type="button"
+                  key={item}
+                  onClick={() => void showPage(sort, item)}
+                  aria-current={item === page ? 'page' : undefined}
+                  aria-label={`第 ${item} 页`}
+                  disabled={loading}
+                >
+                  {item}
+                </button>
+              )
+            )}
+          </div>
+          <button
+            className="pagination-nav"
+            type="button"
+            onClick={() => void showPage(sort, page + 1)}
+            disabled={loading || page === totalPages}
+          >
+            下一页
+          </button>
+        </nav>
+      )}
     </section>
   );
 }
