@@ -1,4 +1,5 @@
 import TeacherSearch from '@/components/TeacherSearch';
+import ZjuLogo from '@/components/ZjuLogo';
 
 export default async function Home({
   searchParams,
@@ -10,7 +11,10 @@ export default async function Home({
   return (
     <>
       <section className="hero">
-        <h1>浙江大学 · 匿名教评</h1>
+        <div className="hero-title">
+          <ZjuLogo className="hero-zju-logo" />
+          <h1 className="hero-brand">查老师</h1>
+        </div>
       </section>
       <TeacherSearch initialQ={q} />
     </>

@@ -1,14 +1,18 @@
-/** 评分 → 颜色等级。导出一个纯函数供其他组件复用 */
-export function scoreClass(score: string): string {
-  const n = parseFloat(score);
-  if (Number.isNaN(n)) return 'na';
-  if (n >= 9) return 'good';
-  if (n >= 8) return 'fine';
-  if (n >= 7) return 'mid';
-  if (n >= 6) return 'low';
-  return 'bad';
-}
+'use client';
 
+import { rgbToCss, scaleColor, scoreT, useThemeScale } from '@/lib/colorScale';
+
+/**
+ * 综合评分徽章。颜色按 0-10 分制绝对位置动态取色(6 分以下均为最低档橙色),
+ * 主题自适应; N/A 用中性灰。同一色阶与课程绩点页一致。
+ */
 export default function ScoreBadge({ score }: { score: string }) {
-  return <span className={`score score-${scoreClass(score)}`}>{score}</span>;
+  const stops = useThemeScale();
+  const t = scoreT(score);
+  const bg = stops && t !== null ? rgbToCss(scaleColor(t, stops)) : undefined;
+  return (
+    <span className={`score${t === null ? ' score-na' : ''}`} style={bg ? { background: bg } : undefined}>
+      {score}
+    </span>
+  );
 }

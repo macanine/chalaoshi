@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Comment, CommentSort } from '@/lib/types';
+import { apiError, isComment, isSafeInt, readJson } from '@/lib/apiClient';
 
 const PAGE_SIZE = 20;
 
@@ -9,24 +10,6 @@ interface PageState {
   comments: Comment[];
   total: number;
   page: number;
-}
-
-function isComment(value: unknown): value is Comment {
-  if (!value || typeof value !== 'object') return false;
-  const comment = value as Partial<Comment>;
-  return (
-    typeof comment.id === 'string' &&
-    typeof comment.content === 'string' &&
-    typeof comment.likes === 'number' &&
-    Number.isFinite(comment.likes) &&
-    typeof comment.date === 'string'
-  );
-}
-
-function apiError(data: unknown, fallback: string): string {
-  return data !== null && typeof data === 'object' && typeof (data as { error?: unknown }).error === 'string'
-    ? (data as { error: string }).error
-    : fallback;
 }
 
 function pageItems(current: number, total: number): Array<number | 'gap'> {
@@ -83,17 +66,19 @@ export default function CommentSection({
         const res = await fetch(`/api/comments/${tid}?sort=${s}&limit=${PAGE_SIZE}&offset=${offset}`, {
           signal: controller.signal,
         });
-        const data = await res.json().catch(() => ({}));
+        const data = await readJson(res);
         if (!res.ok) throw new Error(apiError(data, '加载失败'));
+        const comments = data.comments;
+        const total = data.total;
         if (
-          !Array.isArray(data.comments) ||
-          !data.comments.every(isComment) ||
-          !Number.isSafeInteger(data.total) ||
-          data.total < 0
+          !Array.isArray(comments) ||
+          !comments.every(isComment) ||
+          !isSafeInt(total) ||
+          total < 0
         ) {
           throw new Error('服务返回了无效的评论数据');
         }
-        return { comments: data.comments, total: data.total, page: targetPage };
+        return { comments, total, page: targetPage };
       })();
 
       requestsRef.current.set(key, request);
@@ -173,11 +158,10 @@ export default function CommentSection({
   return (
     <section className="panel">
       <h2 className="section-title">评论</h2>
-      <p className="section-sub">
-        共 {total} 条。老评论参考价值低, 判断当前给分请以近期为主。
-      </p>
+      <span className="visually-hidden">共 {total} 条, 老评论参考价值较低</span>
 
-      <div className="tabs" role="tablist" aria-label="评论排序">
+      {/* 排序切换用 button + aria-pressed 语义, 不用残缺的 tablist(缺 role=tab/aria-selected 反而误导读屏) */}
+      <div className="tabs" aria-label="评论排序">
         <button
           type="button"
           className={`tab ${sort === 'time' ? 'active' : ''}`}
@@ -198,7 +182,14 @@ export default function CommentSection({
         </button>
       </div>
 
-      {error && <div className="error-note">{error}</div>}
+      {error && (
+        <div className="comment-error">
+          <div className="error-note">{error}</div>
+          <button className="btn ghost" type="button" onClick={() => void showPage(sort, page)}>
+            重试
+          </button>
+        </div>
+      )}
 
       {loading && comments.length === 0 && (
         <div className="comment-list-skeleton" aria-hidden="true">

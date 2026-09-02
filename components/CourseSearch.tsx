@@ -2,24 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { GpaRow } from '@/lib/types';
+import { apiError, isGpaRow, readJson, replaceUrlParam } from '@/lib/apiClient';
+import { clientCacheGet, clientCacheSet } from '@/lib/clientCache';
 import GpaTable from './GpaTable';
 import RecentQueries from './RecentQueries';
-import { clientCacheGet, clientCacheSet } from '@/lib/clientCache';
 
 const DEBOUNCE_MS = 300;
 const CACHE_TTL_MS = 10 * 60 * 1000;
-
-function isGpaRow(value: unknown): value is GpaRow {
-  if (!value || typeof value !== 'object') return false;
-  const row = value as Partial<GpaRow>;
-  return typeof row.teacher === 'string' && typeof row.gpa === 'string' && typeof row.count === 'string';
-}
-
-function apiError(data: unknown, fallback: string): string {
-  return data !== null && typeof data === 'object' && typeof (data as { error?: unknown }).error === 'string'
-    ? (data as { error: string }).error
-    : fallback;
-}
 
 export default function CourseSearch({ initialCourse = '' }: { initialCourse?: string }) {
   const [course, setCourse] = useState(initialCourse);
@@ -43,6 +32,7 @@ export default function CourseSearch({ initialCourse = '' }: { initialCourse?: s
     setError(null);
     setSearched(kw);
     if (cached) {
+      requestRef.current = null;
       setRows(cached);
       setLoading(false);
       return;
@@ -51,7 +41,7 @@ export default function CourseSearch({ initialCourse = '' }: { initialCourse?: s
     requestRef.current = controller;
     try {
       const res = await fetch('/api/gpa?course=' + encodeURIComponent(kw), { signal: controller.signal });
-      const data = await res.json().catch(() => ({}));
+      const data = await readJson(res);
       if (!res.ok) throw new Error(apiError(data, '查询失败'));
       if (!Array.isArray(data.rows) || !data.rows.every(isGpaRow)) {
         throw new Error('服务返回了无效的绩点数据');
@@ -61,11 +51,13 @@ export default function CourseSearch({ initialCourse = '' }: { initialCourse?: s
       if (seq !== seqRef.current) return;
       if (list.length > 0) window.dispatchEvent(new Event('recent-queries-updated'));
       setRows(list);
+      // 课程词同步到 URL: 刷新不丢词, 结果可直接分享(仅替换历史, 不产生新记录)
+      replaceUrlParam('course', kw);
     } catch (err) {
       if (seq !== seqRef.current) return;
       if (err instanceof DOMException && err.name === 'AbortError') return;
+      // 失败时保持 rows 为 null, 只显示错误——不要误显示"还没有绩点数据"
       setError(err instanceof Error ? err.message : '查询失败');
-      setRows([]);
     } finally {
       if (seq === seqRef.current) {
         requestRef.current = null;
@@ -148,7 +140,7 @@ export default function CourseSearch({ initialCourse = '' }: { initialCourse?: s
           autoFocus={!initialCourse}
         />
         <button type="submit" disabled={loading || !course.trim()}>
-          {loading ? '查询中…' : '查询'}
+          {loading ? '搜索中…' : '搜索'}
         </button>
       </form>
 
@@ -156,13 +148,7 @@ export default function CourseSearch({ initialCourse = '' }: { initialCourse?: s
 
       {error && <div className="error-note">{error}</div>}
 
-      {rows && (
-        <p className="results-count">
-          课程「{searched}」共 {rows.length} 位老师有绩点数据
-        </p>
-      )}
-
-      {rows && <GpaTable rows={rows} />}
+      {rows && <GpaTable rows={rows} course={searched} />}
     </>
   );
 }

@@ -4,8 +4,9 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import CommentSection from './CommentSection';
-import { scoreClass } from './ScoreBadge';
 import type { TeacherDetail as TeacherDetailData } from '@/lib/types';
+import { apiError, isTeacherDetail, readJson } from '@/lib/apiClient';
+import { gpaNum, rgbToCss, scaleColor, scoreNum, scoreT, useThemeScale } from '@/lib/colorScale';
 import { clientCacheGet, clientCacheSet } from '@/lib/clientCache';
 
 type State =
@@ -14,35 +15,6 @@ type State =
   | { status: 'error'; message: string; is404: boolean };
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
-
-function isTeacherDetail(value: unknown): value is TeacherDetailData {
-  if (!value || typeof value !== 'object') return false;
-  const detail = value as Partial<TeacherDetailData>;
-  return (
-    typeof detail.tid === 'string' &&
-    typeof detail.name === 'string' &&
-    typeof detail.college === 'string' &&
-    typeof detail.score === 'string' &&
-    typeof detail.ratingCount === 'string' &&
-    typeof detail.rollCallRate === 'string' &&
-    typeof detail.commentCount === 'string' &&
-    Array.isArray(detail.courses) &&
-    detail.courses.every(
-      (course) =>
-        course !== null &&
-        typeof course === 'object' &&
-        typeof course.name === 'string' &&
-        typeof course.gpa === 'string' &&
-        typeof course.count === 'string'
-    )
-  );
-}
-
-function apiError(data: unknown, fallback: string): string {
-  return data !== null && typeof data === 'object' && typeof (data as { error?: unknown }).error === 'string'
-    ? (data as { error: string }).error
-    : fallback;
-}
 
 function BackBar() {
   const router = useRouter();
@@ -65,6 +37,7 @@ function BackBar() {
 
 export default function TeacherDetail({ tid }: { tid: string }) {
   const [state, setState] = useState<State>({ status: 'loading' });
+  const stops = useThemeScale();
 
   useEffect(() => {
     let alive = true;
@@ -81,7 +54,7 @@ export default function TeacherDetail({ tid }: { tid: string }) {
       setState({ status: 'loading' });
       try {
         const res = await fetch(`/api/teacher/${tid}`, { signal: controller.signal });
-        const data = await res.json().catch(() => ({}));
+        const data = await readJson(res);
         if (!alive) return;
         if (!res.ok) {
           setState({ status: 'error', message: apiError(data, '加载失败'), is404: res.status === 404 });
@@ -168,6 +141,16 @@ export default function TeacherDetail({ tid }: { tid: string }) {
 
   const d = state.d;
 
+  // 综合评分: 0-10 分制绝对动态色
+  const scoreTVal = scoreT(d.score);
+  const scoreColor = stops && scoreTVal !== null ? rgbToCss(scaleColor(scoreTVal, stops)) : undefined;
+
+  // 各课程绩点: 相对本老师全部课程的区间取色(同一色阶, 便于对比给分)
+  const courseGpaNums = d.courses.map((c) => gpaNum(c.gpa)).filter((n) => n >= 0);
+  const courseMin = courseGpaNums.length ? Math.min(...courseGpaNums) : null;
+  const courseMax = courseGpaNums.length ? Math.max(...courseGpaNums) : null;
+  const courseRange = courseMin !== null && courseMax !== null ? courseMax - courseMin : 0;
+
   return (
     <>
       <BackBar />
@@ -179,7 +162,12 @@ export default function TeacherDetail({ tid }: { tid: string }) {
             <p className="teacher-college">{d.college}</p>
           </div>
           <div className="teacher-score">
-            <span className={`score-big ${scoreClass(d.score)}`}>{d.score}</span>
+            <span
+              className={`score-big${scoreNum(d.score) === null ? ' na' : ''}`}
+              style={scoreColor ? { color: scoreColor } : undefined}
+            >
+              {d.score}
+            </span>
             <span className="teacher-score-label">综合评分</span>
           </div>
         </div>
@@ -203,22 +191,30 @@ export default function TeacherDetail({ tid }: { tid: string }) {
       {d.courses.length > 0 && (
         <section className="panel">
           <h2 className="section-title">课程绩点</h2>
-          <p className="section-sub">来自「课否」, 格式: 平均绩点 / 人数</p>
+          <span className="visually-hidden">格式: 平均绩点 / 人数</span>
           <div className="course-grid">
-            {d.courses.map((c) => (
-              <a
-                className="course-chip course-chip-link"
-                key={c.name}
-                href={`/course?course=${encodeURIComponent(c.name)}`}
-                target="_blank"
-                rel="noreferrer"
-                title={`新标签页查「${c.name}」的绩点`}
-              >
-                <span className="course-chip-name">{c.name}</span>
-                <span className="course-chip-gpa">{c.gpa}</span>
-                {c.count && <span className="course-chip-count">{c.count} 人</span>}
-              </a>
-            ))}
+            {d.courses.map((c) => {
+              const n = gpaNum(c.gpa);
+              const relT =
+                stops && courseRange > 0 && courseMin !== null && n >= 0 ? (n - courseMin) / courseRange : null;
+              const chipColor = stops && relT !== null ? rgbToCss(scaleColor(relT, stops)) : undefined;
+              return (
+                <Link
+                  className="course-chip course-chip-link"
+                  key={c.name}
+                  href={`/course?course=${encodeURIComponent(c.name)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  title={`新标签页查「${c.name}」的绩点`}
+                >
+                  <span className="course-chip-name">{c.name}</span>
+                  <span className="course-chip-gpa" style={chipColor ? { color: chipColor } : undefined}>
+                    {c.gpa}
+                  </span>
+                  {c.count && <span className="course-chip-count">{c.count} 人</span>}
+                </Link>
+              );
+            })}
           </div>
         </section>
       )}

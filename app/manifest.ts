@@ -14,8 +14,13 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: '#2f6df6',
     lang: 'zh-CN',
     icons: [
+      // 192/512 是 Android 安装到主屏 / 应用列表的必需尺寸; maskable 需要更大的安全边距
+      { src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+      { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+      { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
       { src: '/icon.png', sizes: '150x150', type: 'image/png', purpose: 'any' },
       { src: '/icon.png', sizes: '150x150', type: 'image/png', purpose: 'maskable' },
+      { src: '/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
     ],
   };
 }

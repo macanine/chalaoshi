@@ -68,6 +68,13 @@ function cached<T>(key: string, ttlMs: number, load: () => Promise<T>): Promise<
   return request;
 }
 
+// 确定性的"不存在"(404)短暂负缓存: 避免爬虫刷不存在的资源时每次都打穿到上游
+const NEGATIVE_TTL_MS = 30_000;
+
+function markNotFound(key: string): void {
+  cacheSet(key, true, NEGATIVE_TTL_MS);
+}
+
 function parseBases(env: string | undefined, fallback: string): string[] {
   // env 与 fallback 都是逗号分隔的域名串, 统一按逗号拆(之前 fallback 分支漏拆,
   // 导致 next dev 里 env 未注入时把 "a.com,b.com" 当成了单个域名, 必 502)
@@ -290,12 +297,30 @@ function parseGpaCount(raw: string): { gpa: string; count: string } {
 
 export async function teacherDetail(tid: string): Promise<TeacherDetail> {
   const key = `teacher:${tid}`;
+  const notFoundKey = `teacher-nf:${tid}`;
+
+  const cachedNotFound = cacheGet<true>(notFoundKey);
+  if (cachedNotFound) {
+    throw new UpstreamError('未找到该老师(可能不存在或已被删除)', {
+      code: 'teacher_not_found',
+    });
+  }
+
   return cached(key, ttlSeconds('TEACHER') * 1000, async () => {
-    const body = await fetchWithFailover(getWebBases(), `/t/${tid}/`);
+    let body: string;
+    try {
+      body = await fetchWithFailover(getWebBases(), `/t/${tid}/`);
+    } catch (e) {
+      // 上游 404 也是确定性的"不存在", 一并负缓存(30s)再原样抛出
+      if (e instanceof UpstreamError && e.upstreamStatus === 404) markNotFound(notFoundKey);
+      throw e;
+    }
 
     const nameM = body.match(/class="teacher">[\s\S]*?<h3>([^<]+)<\/h3>/);
     const name = cleanHtml(nameM?.[1] ?? '');
     if (!name) {
+      // 200 但解析不出老师: 同样视为不存在, 短暂负缓存
+      markNotFound(notFoundKey);
       throw new UpstreamError('未找到该老师(可能不存在或已被删除)', {
         code: 'teacher_not_found',
       });

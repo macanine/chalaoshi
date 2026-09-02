@@ -187,14 +187,57 @@ textarea {
 }
 
 .hero {
+  position: relative;
   text-align: center;
-  padding: 48px 0 28px;
+  padding: 56px 0 30px;
 }
 
-.hero h1 {
-  font-size: 32px;
-  margin: 0 0 10px;
-  letter-spacing: 0.5px;
+/* 徽标背后一层柔和的主题色光晕, 不拦截点击 */
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -24px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 340px;
+  height: 220px;
+  background: radial-gradient(ellipse at center, var(--accent-soft), transparent 72%);
+  pointer-events: none;
+}
+
+.hero-title {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.hero-zju-logo {
+  display: block;
+  height: 42px;
+  width: auto;
+  color: var(--accent);
+}
+
+.hero-brand {
+  margin: 0;
+  font-size: 38px;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: 2px;
+}
+
+/* 仅屏幕阅读器可见的说明文字(视觉上按“能不要就不要”原则隐藏) */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 /* ------------------------------------------------ search */
@@ -387,10 +430,26 @@ textarea {
   margin: 0 0 4px;
 }
 
-.section-sub {
+.section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.section-head .section-title {
+  margin: 0;
+}
+
+.section-count {
+  flex-shrink: 0;
+  padding: 2px 10px;
+  font-size: 12px;
   color: var(--muted);
-  font-size: 13px;
-  margin: 0 0 14px;
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  white-space: nowrap;
 }
 
 /* teacher search results */
@@ -458,16 +517,14 @@ textarea {
   font-weight: 700;
   font-size: 15px;
   color: #fff;
+  background: var(--accent); /* 动态色阶挂载前的默认底色, 保证白字可读 */
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
   flex-shrink: 0;
 }
 
-.score-good { background: var(--green); }
-.score-fine { background: var(--teal); }
-.score-mid  { background: var(--amber); }
-.score-low  { background: var(--orange); }
-.score-bad  { background: var(--red); }
-.score-na   { background: var(--muted); }
+.score-na {
+  background: var(--muted);
+}
 
 /* ------------------------------------------------ teacher page */
 .back-bar {
@@ -535,14 +592,12 @@ textarea {
   font-size: 40px;
   font-weight: 800;
   line-height: 1;
+  color: var(--text); /* 动态色挂载前的默认色 */
 }
 
-.score-big.good { color: var(--green); }
-.score-big.fine { color: var(--teal); }
-.score-big.mid  { color: var(--amber); }
-.score-big.low  { color: var(--orange); }
-.score-big.bad  { color: var(--red); }
-.score-big.na   { color: var(--muted); }
+.score-big.na {
+  color: var(--muted);
+}
 
 .teacher-score-label {
   font-size: 12px;
@@ -628,7 +683,7 @@ textarea {
 .course-chip-gpa {
   font-size: 16px;
   font-weight: 700;
-  color: var(--accent);
+  color: var(--text); /* 动态相对色阶由内联 style 提供 */
 }
 
 .course-chip-count {
@@ -697,6 +752,20 @@ textarea {
   gap: 4px;
   color: var(--accent);
   font-weight: 600;
+}
+
+.comment-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.comment-error .error-note {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
 }
 
 .pagination {
@@ -769,50 +838,111 @@ textarea {
   padding-top: 6px;
 }
 
-/* ------------------------------------------------ table (gpa) */
+/* ------------------------------------------------ table (横向滚动容器, docs 参数表在用) */
 .table-wrap {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }
 
-table.gpa {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 14px;
+/* 课程绩点对比: 排名列表 */
+.gpa-rank {
+  list-style: none;
+  margin: 0;
+  padding: 0;
 }
 
-table.gpa th,
-table.gpa td {
-  text-align: left;
-  padding: 11px 12px;
-  border-bottom: 1px solid var(--border);
+.gpa-rank li {
+  animation: rise 0.25s ease both;
 }
 
-table.gpa th {
-  color: var(--muted);
-  font-weight: 600;
+.gpa-rank li + li {
+  border-top: 1px solid var(--border);
+}
+
+.gpa-rank-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 6px;
+  border-radius: 10px;
+  color: var(--text);
+  transition: background 0.15s;
+}
+
+.gpa-rank-link:hover {
+  background: var(--bg-soft);
+  text-decoration: none;
+}
+
+.gpa-rank-link:active {
+  transform: scale(0.99);
+}
+
+.gpa-rank-pos {
+  flex: 0 0 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
   font-size: 13px;
-}
-
-table.gpa tr:last-child td {
-  border-bottom: none;
-}
-
-.gpa-val {
   font-weight: 700;
+  color: var(--muted);
+  background: var(--bg-soft);
 }
 
-.gpa-val.high { color: var(--green); }
-.gpa-val.mid  { color: var(--teal); }
-.gpa-val.low  { color: var(--muted); }
-
-.gpa-teacher {
-  font-weight: 600;
+.gpa-rank-pos.top {
   color: var(--accent);
+  background: var(--accent-soft);
 }
 
-.gpa-teacher:hover {
-  text-decoration: underline;
+.gpa-rank-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.gpa-rank-teacher {
+  font-size: 15px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gpa-rank-count {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.gpa-rank-val {
+  flex-shrink: 0;
+  min-width: 56px;
+  text-align: right;
+  font-size: 20px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.gpa-rank-val.empty {
+  color: var(--muted);
+}
+
+/* 最高 / 最低 / 相差概览 */
+.gpa-range {
+  margin: 0 0 14px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--muted);
+  background: var(--bg-soft);
+  border-radius: 10px;
+}
+
+.gpa-range-val {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ------------------------------------------------ buttons / misc */
@@ -867,12 +997,6 @@ table.gpa tr:last-child td {
   font-size: 28px;
   margin: 0 0 8px;
   color: var(--text);
-}
-
-.gpa-note {
-  font-size: 12px;
-  color: var(--muted);
-  margin-top: 14px;
 }
 
 /* ------------------------------------------------ skeleton / spinner */
@@ -933,6 +1057,7 @@ table.gpa tr:last-child td {
   .spinner,
   .comment,
   .teacher-list li,
+  .gpa-rank li,
   .search-form,
   .recent-queries-track,
   .search-form input:focus {
@@ -1013,13 +1138,17 @@ table.gpa tr:last-child td {
 .site-pv {
   display: inline-flex;
   align-items: center;
+  gap: 6px;
+  color: var(--muted);
   white-space: nowrap;
 }
 
+.site-pv svg {
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+
 .site-pv-value {
-  display: inline-block;
-  width: 8ch;
-  text-align: center;
   font-variant-numeric: tabular-nums;
 }
 
@@ -1055,11 +1184,25 @@ table.gpa tr:last-child td {
 
 @media (max-width: 640px) {
   .hero {
-    padding: 26px 0 18px;
+    padding: 30px 0 18px;
   }
 
-  .hero h1 {
-    font-size: 24px;
+  .hero::before {
+    width: 280px;
+    height: 180px;
+  }
+
+  .hero-title {
+    gap: 10px;
+  }
+
+  .hero-zju-logo {
+    height: 34px;
+  }
+
+  .hero-brand {
+    font-size: 30px;
+    letter-spacing: 2px;
   }
 
   .search-form {
@@ -1140,55 +1283,5 @@ table.gpa tr:last-child td {
 
   .comment-body {
     font-size: 16px;
-  }
-
-  /* 绩点表在手机上变成卡片列表 */
-  .table-wrap {
-    overflow: visible;
-  }
-
-  table.gpa thead {
-    display: none;
-  }
-
-  table.gpa,
-  table.gpa tbody,
-  table.gpa tr,
-  table.gpa td {
-    display: block;
-  }
-
-  table.gpa tr {
-    background: var(--bg-soft);
-    border-radius: 12px;
-    padding: 12px 14px;
-    margin-bottom: 10px;
-  }
-
-  table.gpa td {
-    padding: 0;
-    border-bottom: none;
-  }
-
-  table.gpa td:first-child {
-    font-weight: 600;
-    font-size: 15px;
-  }
-
-  table.gpa td:nth-child(2),
-  table.gpa td:nth-child(3) {
-    display: inline-block;
-    margin-top: 2px;
-    font-size: 13px;
-  }
-
-  table.gpa td:nth-child(2) {
-    font-weight: 700;
-    color: var(--accent);
-    margin-right: 10px;
-  }
-
-  table.gpa td:nth-child(3) {
-    color: var(--muted);
   }
 }

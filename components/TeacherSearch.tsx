@@ -2,29 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { TeacherHit } from '@/lib/types';
+import { apiError, isTeacherHit, readJson, replaceUrlParam } from '@/lib/apiClient';
+import { clientCacheGet, clientCacheSet } from '@/lib/clientCache';
 import TeacherCard from './TeacherCard';
 import RecentQueries from './RecentQueries';
-import { clientCacheGet, clientCacheSet } from '@/lib/clientCache';
 
 const DEBOUNCE_MS = 300;
 const CACHE_TTL_MS = 2 * 60 * 1000;
-
-function isTeacherHit(value: unknown): value is TeacherHit {
-  if (!value || typeof value !== 'object') return false;
-  const hit = value as Partial<TeacherHit>;
-  return (
-    typeof hit.tid === 'string' &&
-    typeof hit.name === 'string' &&
-    typeof hit.college === 'string' &&
-    typeof hit.score === 'string'
-  );
-}
-
-function apiError(data: unknown, fallback: string): string {
-  return data !== null && typeof data === 'object' && typeof (data as { error?: unknown }).error === 'string'
-    ? (data as { error: string }).error
-    : fallback;
-}
 
 export default function TeacherSearch({ initialQ = '' }: { initialQ?: string }) {
   const [q, setQ] = useState(initialQ);
@@ -48,6 +32,7 @@ export default function TeacherSearch({ initialQ = '' }: { initialQ?: string }) 
     setError(null);
     setSearched(kw);
     if (cached) {
+      requestRef.current = null;
       setTeachers(cached);
       setLoading(false);
       return;
@@ -56,7 +41,7 @@ export default function TeacherSearch({ initialQ = '' }: { initialQ?: string }) 
     requestRef.current = controller;
     try {
       const res = await fetch('/api/search?q=' + encodeURIComponent(kw), { signal: controller.signal });
-      const data = await res.json().catch(() => ({}));
+      const data = await readJson(res);
       if (!res.ok) throw new Error(apiError(data, '查询失败'));
       if (!Array.isArray(data.teachers) || !data.teachers.every(isTeacherHit)) {
         throw new Error('服务返回了无效的老师数据');
@@ -65,11 +50,13 @@ export default function TeacherSearch({ initialQ = '' }: { initialQ?: string }) 
       clientCacheSet(key, list, CACHE_TTL_MS);
       if (seq !== seqRef.current) return; // 已被更新的请求取代
       setTeachers(list);
+      // 搜索词同步到 URL: 刷新不丢词, 结果可直接分享(仅替换历史, 不产生新记录)
+      replaceUrlParam('q', kw);
     } catch (err) {
       if (seq !== seqRef.current) return;
       if (err instanceof DOMException && err.name === 'AbortError') return;
+      // 失败时保持 teachers 为 null, 只显示错误——不要误显示"没有匹配的老师"
       setError(err instanceof Error ? err.message : '查询失败');
-      setTeachers([]);
     } finally {
       if (seq === seqRef.current) {
         requestRef.current = null;
@@ -175,7 +162,7 @@ export default function TeacherSearch({ initialQ = '' }: { initialQ?: string }) 
               ))}
             </ul>
           ) : (
-            <p className="results-count">没有匹配的老师(查老师上无记录)。</p>
+            <p className="results-count">没有匹配的老师</p>
           )}
         </>
       )}

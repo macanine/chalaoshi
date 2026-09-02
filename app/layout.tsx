@@ -45,7 +45,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </Link>
             <nav className="nav" aria-label="主导航">
               <Link href="/">查老师</Link>
-              <Link href="/course">查课程绩点</Link>
+              <Link href="/course">查绩点</Link>
               <Link href="/docs">API</Link>
             </nav>
             <a
@@ -66,8 +66,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <BottomNav />
         <footer className="site-footer">
           <div className="container">
-            <span className="site-pv" id="vercount_container_site_pv">
-              本站访问 <span className="site-pv-value" id="vercount_value_site_pv" aria-live="polite">000000</span> 次
+            <span className="site-pv" id="vercount_container_site_pv" title="本站访问次数" aria-label="本站访问次数">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+              <span className="site-pv-value" id="vercount_value_site_pv" aria-live="polite">000000</span>
             </span>
           </div>
         </footer>
