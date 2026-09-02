@@ -19,9 +19,6 @@ export default function GpaTable({ rows, course = '' }: { rows: GpaRow[]; course
     return rgbToCss(scaleColor((v - min) / range, stops));
   };
 
-  const maxColor = max !== null ? colorFor(max) : undefined;
-  const minColor = min !== null ? colorFor(min) : undefined;
-
   return (
     <section className="panel">
       <div className="section-head">
@@ -29,21 +26,6 @@ export default function GpaTable({ rows, course = '' }: { rows: GpaRow[]; course
         <span className="section-count">{rows.length} 位老师</span>
       </div>
       <span className="visually-hidden">按平均绩点从高到低排列, 点老师名查看其评价</span>
-
-      {max !== null && min !== null && max > min && (
-        <p className="gpa-range">
-          最高{' '}
-          <span className="gpa-range-val" style={maxColor ? { color: maxColor } : undefined}>
-            {max.toFixed(1)}
-          </span>
-          {' · 最低 '}
-          <span className="gpa-range-val" style={minColor ? { color: minColor } : undefined}>
-            {min.toFixed(1)}
-          </span>
-          {' · 相差 '}
-          <span className="gpa-range-val">{Number((max - min).toFixed(1))}</span>
-        </p>
-      )}
 
       {sorted.length === 0 ? (
         <p className="results-count">这门课还没有绩点数据。</p>

@@ -930,21 +930,6 @@ textarea {
   color: var(--muted);
 }
 
-/* 最高 / 最低 / 相差概览 */
-.gpa-range {
-  margin: 0 0 14px;
-  padding: 8px 12px;
-  font-size: 13px;
-  color: var(--muted);
-  background: var(--bg-soft);
-  border-radius: 10px;
-}
-
-.gpa-range-val {
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
 /* ------------------------------------------------ buttons / misc */
 .btn {
   display: inline-flex;
@@ -1136,7 +1121,8 @@ textarea {
 }
 
 .site-pv {
-  display: inline-flex;
+  /* vercount 脚本会给容器注入 display:inline, 用 !important 保住 flex, 否则图标回落到文字基线错位 */
+  display: inline-flex !important;
   align-items: center;
   gap: 6px;
   color: var(--muted);
