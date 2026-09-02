@@ -12,7 +12,7 @@
 - 只使用 `pnpm`。不得使用 npm 或 yarn，也不得产生它们的 lockfile。
 - API 由 Route Handler 提供；缓存、限流和 CORS 统一由 `lib/` 处理。
 - 前端以客户端组件提供 SPA 体验；不引入 UI 库。
-- 部署目标为 OpenNext Cloudflare Worker。部署细节见 `CLOUDFLARE_DEPLOY.md`。
+- 部署目标为 OpenNext Cloudflare Worker（细节见 `CLOUDFLARE_DEPLOY.md`），同时保持 Vercel 可部署（`vercel.json`、路由 `maxDuration`、`middleware.ts` 规范域名跳转）。
 - 生产数据来自匿名评价和「课否」，存在幸存者偏差与时效性。UI 文案不得把数据表达成事实保证。
 
 ## 目录与职责
@@ -21,23 +21,32 @@
 app/
   api/                    JSON Route Handlers
   page.tsx                老师搜索首页，透传 ?q=
-  course/page.tsx         课程绩点页，透传 ?course=
+  course/page.tsx         课程绩点页（查绩点），透传 ?course=
   teacher/[tid]/page.tsx  仅传递 tid 的薄页面包装
   docs/                   人类可读 API 文档；/api 始终是 JSON
+  manifest.ts             PWA manifest
   layout.tsx              全局壳、导航、页脚
   globals.css             全站 tokens 与样式
 components/
-  TeacherSearch.tsx       老师即时搜索
-  CourseSearch.tsx        课程即时搜索
+  TeacherSearch.tsx       老师即时搜索（300ms 防抖 + IME composition 保护）
+  CourseSearch.tsx        课程即时搜索（同上）
+  TeacherCard.tsx         搜索结果卡片
+  ScoreBadge.tsx          综合评分徽章（动态色阶）
   TeacherDetail.tsx       客户端拉取详情与骨架屏
-  CommentSection.tsx      评论排序、预取和无限滚动
+  CommentSection.tsx      评论显式分页、预取与缓存
   GpaTable.tsx            课程绩点表
+  RecentQueries.tsx       首页「最近查询」展示
+  BottomNav.tsx           移动端底部导航
+  SkillGuide.tsx          /docs 页的 Skill 安装指引
+  ZjuLogo.tsx             浙大校徽长标识（内联 SVG，currentColor）
 lib/
   chalaoshi.ts            上游请求、熔断、缓存和 HTML 解析
   http.ts                 JSON、CORS、限流与错误映射
   cache.ts                有界服务端 TTL 缓存
   clientCache.ts          有界会话缓存
   ratelimit.ts            有界滑动窗口限流
+  recent.ts               服务端「最近查询」记录（内存、单实例）
+  colorScale.ts           评分/绩点动态色阶（读 CSS tokens）
   types.ts                API 结构类型
   apiEndpoints.ts         /api 与 /docs 共用的端点清单
 ```

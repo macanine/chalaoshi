@@ -77,13 +77,14 @@ pnpm cf:deploy    # 构建并部署到 Cloudflare
 
 - 环境变量写在 `wrangler.jsonc` 的 `vars` 里，换域名改这里或 Cloudflare dashboard 的变量即可，不动代码
 - 首次部署 `pnpm exec wrangler login`；也支持 Git 集成（Workers Builds）
-- 完整流程见 [`CLOUDFLARE_DEPLOY.md`](CLOUDFLARE_DEPLOY.md)
+- 完整流程（Git 集成、自定义域名、`--keep-vars`、排障）见 [`CLOUDFLARE_DEPLOY.md`](CLOUDFLARE_DEPLOY.md)
 
 ### Vercel
 
 - 仓库含 `vercel.json`，在 Vercel dashboard 导入项目即可，或 `vercel` CLI 部署
 - API 路由已设 `maxDuration = 60`（上游抓取可能超过默认 10s）
-- 环境变量在 dashboard 的 Settings → Environment Variables 配置（同环境变量表）；不配则用代码默认值
+- 环境变量在 dashboard 的 Settings → Environment Variables 配置（同上表）；不配则用代码默认值
+- `middleware.ts` 把 `chalaoshi.vercel.app` 308 跳转到规范域名 `chalaoshi.xhuya.cn`
 
 ### 排障
 
