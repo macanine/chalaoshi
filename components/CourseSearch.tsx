@@ -21,6 +21,14 @@ export default function CourseSearch({ initialCourse = '' }: { initialCourse?: s
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const requestRef = useRef<AbortController | null>(null);
   const seqRef = useRef(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // 仅桌面自动聚焦: 移动端 autoFocus 会立刻弹键盘, 挡住 hero 和最近查询
+  useEffect(() => {
+    if (!initialCourse && window.matchMedia('(pointer: fine)').matches) {
+      inputRef.current?.focus();
+    }
+  }, [initialCourse]);
 
   const runSearch = useCallback(async (kw: string) => {
     const key = `gpa:${kw}`;
@@ -137,7 +145,7 @@ export default function CourseSearch({ initialCourse = '' }: { initialCourse?: s
           autoComplete="off"
           autoCorrect="off"
           spellCheck={false}
-          autoFocus={!initialCourse}
+          ref={inputRef}
         />
         <button type="submit" disabled={loading || !course.trim()}>
           {loading ? '搜索中…' : '搜索'}
@@ -146,7 +154,35 @@ export default function CourseSearch({ initialCourse = '' }: { initialCourse?: s
 
       {!course.trim() && !searched && <RecentQueries kind="course" />}
 
-      {error && <div className="error-note">{error}</div>}
+      {error && (
+        <div className="comment-error">
+          <div className="error-note">{error}</div>
+          <button className="btn ghost" type="button" onClick={() => void runSearch(searched)}>
+            重试
+          </button>
+        </div>
+      )}
+
+      {/* 首次搜索尚无结果时给骨架占位, 与详情页/评论区的加载观感保持一致 */}
+      {loading && rows === null && (
+        <div className="panel" aria-hidden="true">
+          <div className="skeleton" style={{ width: 130, height: 20 }} />
+          <ol className="gpa-rank" style={{ marginTop: 10 }}>
+            {[0, 1, 2, 3].map((i) => (
+              <li key={i}>
+                <div className="gpa-rank-link" style={{ pointerEvents: 'none' }}>
+                  <div className="skeleton" style={{ width: 30, height: 30, borderRadius: 9 }} />
+                  <div className="gpa-rank-info">
+                    <div className="skeleton" style={{ width: 88, height: 16 }} />
+                    <div className="skeleton" style={{ width: 60, height: 12, marginTop: 6 }} />
+                  </div>
+                  <div className="skeleton" style={{ width: 56, height: 24, borderRadius: 6 }} />
+                </div>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
 
       {rows && <GpaTable rows={rows} course={searched} />}
     </>

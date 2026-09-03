@@ -73,7 +73,7 @@
   position: relative;
   min-height: 106px;
   padding: 34px 12px 12px;
-  background: var(--bg-soft);
+  background: var(--chip-bg);
   border-radius: 8px;
   counter-increment: skill-step;
 }
@@ -253,7 +253,7 @@
   font-size: 0.9em;
   padding: 1px 6px;
   border-radius: 6px;
-  background: var(--bg-soft);
+  background: var(--chip-bg);
   color: var(--accent);
 }
 

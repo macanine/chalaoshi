@@ -21,6 +21,14 @@ export default function TeacherSearch({ initialQ = '' }: { initialQ?: string }) 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const requestRef = useRef<AbortController | null>(null);
   const seqRef = useRef(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // 仅桌面自动聚焦: 移动端 autoFocus 会立刻弹键盘, 挡住 hero 和最近查询
+  useEffect(() => {
+    if (!initialQ && window.matchMedia('(pointer: fine)').matches) {
+      inputRef.current?.focus();
+    }
+  }, [initialQ]);
 
   const runSearch = useCallback(async (kw: string) => {
     const key = `search:${kw}`;
@@ -137,7 +145,7 @@ export default function TeacherSearch({ initialQ = '' }: { initialQ?: string }) 
           autoComplete="off"
           autoCorrect="off"
           spellCheck={false}
-          autoFocus={!initialQ}
+          ref={inputRef}
         />
         <button type="submit" disabled={loading || !q.trim()}>
           {loading ? '搜索中…' : '搜索'}
@@ -146,7 +154,29 @@ export default function TeacherSearch({ initialQ = '' }: { initialQ?: string }) 
 
       {!q.trim() && !searched && <RecentQueries kind="teacher" />}
 
-      {error && <div className="error-note">{error}</div>}
+      {error && (
+        <div className="comment-error">
+          <div className="error-note">{error}</div>
+          <button className="btn ghost" type="button" onClick={() => void runSearch(searched)}>
+            重试
+          </button>
+        </div>
+      )}
+
+      {/* 首次搜索尚无结果时给骨架占位, 与详情页/评论区的加载观感保持一致 */}
+      {loading && teachers === null && (
+        <div aria-hidden="true">
+          {[0, 1, 2].map((i) => (
+            <div className="teacher-card" key={i}>
+              <div>
+                <div className="skeleton" style={{ width: 96, height: 20 }} />
+                <div className="skeleton" style={{ width: 140, height: 14, marginTop: 8 }} />
+              </div>
+              <div className="skeleton" style={{ width: 56, height: 30, borderRadius: 8 }} />
+            </div>
+          ))}
+        </div>
+      )}
 
       {teachers !== null && (
         <>

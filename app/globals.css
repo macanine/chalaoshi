@@ -2,6 +2,7 @@
   --bg: #f5f6f8;
   --bg-soft: #eceef1;
   --card: #ffffff;
+  --chip-bg: #eceef1; /* 卡片内嵌块(course-chip 等): 浅色下即 bg-soft, 暗色下单独提亮保证与卡片可区分 */
   --border: #e3e6ea;
   --text: #1b1f27;
   --muted: #6b7280;
@@ -31,6 +32,7 @@
     --bg: #0e1013;
     --bg-soft: #161a21;
     --card: #171b22;
+    --chip-bg: #212833;
     --border: #272e38;
     --text: #e7e9ee;
     --muted: #99a2af;
@@ -293,6 +295,7 @@ textarea {
 
 .search-form button {
   flex-shrink: 0;
+  min-width: 104px; /* 「搜索」↔「搜索中…」宽度不跳 */
   height: 48px;
   padding: 0 22px;
   font-size: 15px;
@@ -446,7 +449,7 @@ textarea {
   padding: 2px 10px;
   font-size: 12px;
   color: var(--muted);
-  background: var(--bg-soft);
+  background: var(--chip-bg);
   border: 1px solid var(--border);
   border-radius: 99px;
   white-space: nowrap;
@@ -641,7 +644,7 @@ textarea {
   flex-direction: column;
   gap: 2px;
   padding: 12px 14px;
-  background: var(--bg-soft);
+  background: var(--chip-bg);
   border: 1px solid transparent; /* 占位, 悬浮变 accent 时不抖动 */
   border-radius: 10px;
 }
@@ -725,6 +728,12 @@ textarea {
   padding: 16px 2px;
   border-bottom: 1px solid var(--border);
   animation: rise 0.25s ease both;
+  transition: opacity 0.15s;
+}
+
+/* 翻页请求进行中: 保留旧内容但整体降透明, 给出轻量加载反馈 */
+.panel.is-busy .comment {
+  opacity: 0.55;
 }
 
 .comment:last-of-type {
@@ -888,7 +897,7 @@ textarea {
   font-size: 13px;
   font-weight: 700;
   color: var(--muted);
-  background: var(--bg-soft);
+  background: var(--chip-bg);
 }
 
 .gpa-rank-pos.top {
@@ -990,7 +999,7 @@ textarea {
   position: relative;
   overflow: hidden;
   width: 100%; /* 默认占满所在单元格, 避免宽度塌陷 */
-  background: var(--bg-soft);
+  background: var(--chip-bg); /* 暗色下 bg-soft 与卡片几乎同色, 骨架屏用提亮一档的 chip-bg */
   border-radius: 8px;
 }
 
@@ -1135,6 +1144,10 @@ textarea {
 }
 
 .site-pv-value {
+  /* 预留等宽数字位: 「—」→ 真实 PV 时宽度不跳, 脚本失败时占位也不突兀 */
+  display: inline-block;
+  min-width: 6ch;
+  text-align: center;
   font-variant-numeric: tabular-nums;
 }
 

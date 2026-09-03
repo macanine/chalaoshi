@@ -156,7 +156,7 @@ export default function CommentSection({
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
   return (
-    <section className="panel">
+    <section className={`panel${loading && comments.length > 0 ? ' is-busy' : ''}`}>
       <h2 className="section-title">评论</h2>
       <span className="visually-hidden">共 {total} 条, 老评论参考价值较低</span>
 

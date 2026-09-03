@@ -71,7 +71,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
                 <circle cx="12" cy="12" r="3" />
               </svg>
-              <span className="site-pv-value" id="vercount_value_site_pv" aria-live="polite">000000</span>
+              {/* vercount 会把内容替换成真实 PV; 用短横线占位, 脚本被拦截或未加载时不会显示假的 000000 */}
+              <span className="site-pv-value" id="vercount_value_site_pv" aria-live="polite">—</span>
             </span>
           </div>
         </footer>
